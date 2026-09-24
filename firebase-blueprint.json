@@ -1,0 +1,366 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role-based access information.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "displayName": { "type": "string", "maxLength": 128 },
+        "role": { "type": "string", "enum": ["ADMIN", "BEEKEEPER", "LAB", "CONSUMER"] },
+        "beekeeperId": { "type": "string", "maxLength": 64 },
+        "labId": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "email", "role"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Trusted admin identifier document for robust server/rule RBAC checks.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Beekeeper": {
+      "title": "Beekeeper",
+      "description": "Beekeeper registration profile, government IDs verification, and status.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "beekeeperId": { "type": "string", "maxLength": 32 },
+        "beekeeperSeq": { "type": "number" },
+        "name": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "phone": { "type": "string", "maxLength": 20 },
+        "state": { "type": "string", "maxLength": 64 },
+        "district": { "type": "string", "maxLength": 64 },
+        "address": { "type": "string", "maxLength": 300 },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" },
+        "aadhaarLast4": { "type": "string", "maxLength": 4, "minLength": 4 },
+        "aadhaarHash": { "type": "string", "maxLength": 128 },
+        "madhukrantiId": { "type": "string", "maxLength": 64 },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "suspended"] },
+        "rejectionReason": { "type": "string", "maxLength": 500 },
+        "approvedBy": { "type": "string", "maxLength": 128 },
+        "approvedAt": { "type": "string" },
+        "isSample": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "name", "state", "district", "aadhaarLast4", "aadhaarHash", "madhukrantiId", "status"]
+    },
+    "Counter": {
+      "title": "Counter",
+      "description": "Atomic sequence counter document used by transactions to safely generate unique IDs.",
+      "type": "object",
+      "properties": {
+        "current": { "type": "number" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["current"]
+    },
+    "Hive": {
+      "title": "Hive",
+      "description": "Hive registration belonging to a beekeeper with colony info, GPS, and status.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "hiveId": { "type": "string", "maxLength": 64 },
+        "beekeeperId": { "type": "string", "maxLength": 32 },
+        "hiveType": { "type": "string", "enum": ["Langstroth", "KTB", "Traditional", "Other"] },
+        "colonyType": { "type": "string", "enum": ["Apis cerana indica", "Apis mellifera", "Apis dorsata", "Apis florea", "Stingless"] },
+        "area": { "type": "string", "maxLength": 100 },
+        "landType": { "type": "string", "enum": ["Forest", "Farmland", "Urban", "Orchard", "Mangrove", "Other"] },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" },
+        "address": { "type": "string", "maxLength": 300 },
+        "imageUrl": { "type": "string", "maxLength": 5000 },
+        "setupDate": { "type": "string" },
+        "registrationDate": { "type": "string" },
+        "expectedProduction": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "inactive", "decommissioned"] },
+        "approvalStatus": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "iotDeviceId": { "type": "string", "maxLength": 64 },
+        "isSample": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "hiveId", "beekeeperId", "hiveType", "colonyType", "status"]
+    },
+    "IoTDevice": {
+      "title": "IoTDevice",
+      "description": "Hardware sensor node paired to a hive with hashed API key authentication.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "deviceSerial": { "type": "string", "maxLength": 64 },
+        "apiKeyHash": { "type": "string", "maxLength": 128 },
+        "hiveId": { "type": "string", "maxLength": 64 },
+        "beekeeperId": { "type": "string", "maxLength": 32 },
+        "model": { "type": "string", "maxLength": 64 },
+        "batteryPercent": { "type": "number" },
+        "status": { "type": "string", "enum": ["online", "offline", "unpaired"] },
+        "lastReadingAt": { "type": "string" },
+        "isSample": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "deviceSerial", "apiKeyHash", "hiveId", "beekeeperId", "status"]
+    },
+    "SensorReading": {
+      "title": "SensorReading",
+      "description": "Time-series telemetry reading from IoT device (temperature, humidity, weight, battery).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "deviceSerial": { "type": "string", "maxLength": 64 },
+        "hiveId": { "type": "string", "maxLength": 64 },
+        "beekeeperId": { "type": "string", "maxLength": 32 },
+        "temperature": { "type": "number" },
+        "humidity": { "type": "number" },
+        "weight": { "type": "number" },
+        "battery": { "type": "number" },
+        "timestamp": { "type": "string" },
+        "isAnomaly": { "type": "boolean" },
+        "isSample": { "type": "boolean" }
+      },
+      "required": ["id", "deviceSerial", "hiveId", "temperature", "humidity", "timestamp"]
+    },
+    "SpeciesThreshold": {
+      "title": "SpeciesThreshold",
+      "description": "Colony species-specific safe operating limits for temperature and humidity.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "colonyType": { "type": "string" },
+        "tempMin": { "type": "number" },
+        "tempMax": { "type": "number" },
+        "humidityMin": { "type": "number" },
+        "humidityMax": { "type": "number" },
+        "notes": { "type": "string", "maxLength": 500 },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "colonyType", "tempMin", "tempMax", "humidityMin", "humidityMax"]
+    },
+    "HealthAlert": {
+      "title": "HealthAlert",
+      "description": "Automated alarm triggered by out-of-range sensor readings, disease detection, or offline status.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "hiveId": { "type": "string", "maxLength": 64 },
+        "beekeeperId": { "type": "string", "maxLength": 32 },
+        "type": { "type": "string", "enum": ["TEMPERATURE_HIGH", "TEMPERATURE_LOW", "HUMIDITY_HIGH", "HUMIDITY_LOW", "DEVICE_OFFLINE", "DISEASE_DETECTED", "WEIGHT_DROP"] },
+        "severity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"] },
+        "message": { "type": "string", "maxLength": 500 },
+        "readingValue": { "type": "number" },
+        "thresholdValue": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "acknowledged", "resolved"] },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "hiveId", "beekeeperId", "type", "severity", "message", "status", "timestamp"]
+    },
+    "DiseaseScan": {
+      "title": "DiseaseScan",
+      "description": "Gemini AI vision analysis of hive frames with condition, severity, and action items.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "hiveId": { "type": "string", "maxLength": 64 },
+        "beekeeperId": { "type": "string", "maxLength": 32 },
+        "images": { "type": "array" },
+        "condition": { "type": "string", "maxLength": 128 },
+        "confidence": { "type": "number" },
+        "severity": { "type": "string", "enum": ["NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL"] },
+        "actions": { "type": "array" },
+        "disclaimer": { "type": "string", "maxLength": 300 },
+        "modelUsed": { "type": "string", "maxLength": 64 },
+        "scannedAt": { "type": "string" },
+        "autoAlertCreated": { "type": "boolean" }
+      },
+      "required": ["id", "hiveId", "beekeeperId", "condition", "confidence", "severity", "scannedAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "In-app alert notification sent to beekeeper or administrator.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 128 },
+        "message": { "type": "string", "maxLength": 500 },
+        "type": { "type": "string", "enum": ["ALERT", "INFO", "APPROVAL"] },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "title", "message", "type", "createdAt"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "Audit trail log of all important actions across the platform.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "actorId": { "type": "string", "maxLength": 128 },
+        "actorRole": { "type": "string", "maxLength": 32 },
+        "actorEmail": { "type": "string", "maxLength": 256 },
+        "action": { "type": "string", "maxLength": 128 },
+        "entityType": { "type": "string", "maxLength": 64 },
+        "entityId": { "type": "string", "maxLength": 128 },
+        "details": { "type": "string", "maxLength": 1000 },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "actorId", "action", "entityType", "timestamp"]
+    },
+    "Setting": {
+      "title": "Setting",
+      "description": "Platform settings, trust score weights, species thresholds, and lookup data.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "key": { "type": "string", "maxLength": 64 },
+        "value": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "key"]
+    },
+    "SystemStat": {
+      "title": "SystemStat",
+      "description": "Pre-computed server-side aggregation statistics for high-performance admin analytics.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "totalBeekeepers": { "type": "number" },
+        "totalHives": { "type": "number" },
+        "totalBatches": { "type": "number" },
+        "totalHarvestVolumeKg": { "type": "number" },
+        "totalGmv": { "type": "number" },
+        "totalOrders": { "type": "number" },
+        "updatedAt": { "type": "string" }
+      }
+    },
+    "Dispute": {
+      "title": "Dispute",
+      "description": "Customer order dispute and refund resolution records with fraud indicators.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderId": { "type": "string" },
+        "userId": { "type": "string" },
+        "reason": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles storing application role and linking information."
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/Admin" },
+      "description": "Admin authorization registry document for verified server and rule validation."
+    },
+    "/beekeepers/{beekeeperDocId}": {
+      "schema": { "$ref": "#/entities/Beekeeper" },
+      "description": "Beekeeper master registration profile, verification checklist and status."
+    },
+    "/counters/{counterId}": {
+      "schema": { "$ref": "#/entities/Counter" },
+      "description": "Transaction-safe counters for auto-generating IDs."
+    },
+    "/hives/{hiveDocId}": {
+      "schema": { "$ref": "#/entities/Hive" },
+      "description": "Hive master records registered by beekeepers."
+    },
+    "/iotDevices/{deviceId}": {
+      "schema": { "$ref": "#/entities/IoTDevice" },
+      "description": "Hardware IoT sensor devices paired with hives."
+    },
+    "/sensorReadings/{readingId}": {
+      "schema": { "$ref": "#/entities/SensorReading" },
+      "description": "Time-series sensor telemetry data."
+    },
+    "/speciesThresholds/{thresholdId}": {
+      "schema": { "$ref": "#/entities/SpeciesThreshold" },
+      "description": "Temperature and humidity thresholds for bee colony species."
+    },
+    "/healthAlerts/{alertId}": {
+      "schema": { "$ref": "#/entities/HealthAlert" },
+      "description": "Colony health and sensor threshold alerts."
+    },
+    "/diseaseScans/{scanId}": {
+      "schema": { "$ref": "#/entities/DiseaseScan" },
+      "description": "Brood frame disease inspections powered by Gemini vision."
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "User notifications for alerts and approvals."
+    },
+    "/activityLogs/{logId}": {
+      "schema": { "$ref": "#/entities/ActivityLog" },
+      "description": "Append-only activity and audit logs."
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/Setting" },
+      "description": "Admin-configurable system settings."
+    },
+    "/harvests/{harvestId}": {
+      "schema": "HarvestRecord",
+      "description": "Raw honey harvest extraction records by beekeepers."
+    },
+    "/batches/{batchId}": {
+      "schema": "BatchRecord",
+      "description": "Aggregated honey batches with IoT verification and lab test provenance."
+    },
+    "/packages/{packageId}": {
+      "schema": "HoneyPack",
+      "description": "Individual serialized honey retail jars with QR codes and scan counts."
+    },
+    "/listings/{listingId}": {
+      "schema": "HoneyListing",
+      "description": "Active honey jars for direct consumer purchase on the marketplace."
+    },
+    "/orders/{orderId}": {
+      "schema": "OrderRecord",
+      "description": "Customer purchase orders with Razorpay payment details and consignment tracking."
+    },
+    "/payouts/{payoutId}": {
+      "schema": "PayoutRecord",
+      "description": "Beekeeper direct settlement payout accounting ledger (90% direct payout)."
+    },
+    "/reviews/{reviewId}": {
+      "schema": "ReviewRecord",
+      "description": "Verified purchase customer reviews and beekeeper replies."
+    },
+    "/trust_scores/{beekeeperId}": {
+      "schema": "TrustScoreBreakdown",
+      "description": "Algorithmic multi-factor trust score breakdown and history for beekeepers."
+    },
+    "/stock_alerts/{alertId}": {
+      "schema": "StockAlert",
+      "description": "Consumer alert subscriptions for rare floral varieties or fresh apiary harvests."
+    },
+    "/system_stats/{statId}": {
+      "schema": { "$ref": "#/entities/SystemStat" },
+      "description": "Pre-computed server-side analytics metrics cache."
+    },
+    "/disputes/{disputeId}": {
+      "schema": { "$ref": "#/entities/Dispute" },
+      "description": "Customer order disputes and refund resolution tracker."
+    },
+    "/audit_logs/{logId}": {
+      "schema": "AuditLog",
+      "description": "Immutable security and administrative audit logs."
+    }
+  }
+}

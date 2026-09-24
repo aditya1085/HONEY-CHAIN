@@ -1,0 +1,311 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSuperAdminEmail() {
+      return isSignedIn() && request.auth.token.email == 'adityatripathi1085@gmail.com';
+    }
+
+    function isAdmin() {
+      return isSuperAdminEmail() || (isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Entity Validators
+    function isValidUser(data) {
+      return data.keys().hasAll(['id', 'email', 'role'])
+        && data.id is string && data.id.size() <= 128
+        && data.email is string && data.email.size() <= 256
+        && data.role in ['ADMIN', 'BEEKEEPER', 'LAB', 'CONSUMER'];
+    }
+
+    function isValidBeekeeperCreate(data) {
+      return data.keys().hasAll(['id', 'userId', 'name', 'state', 'district', 'aadhaarLast4', 'aadhaarHash', 'madhukrantiId', 'status'])
+        && data.id is string && data.id.size() <= 128
+        && data.userId == request.auth.uid
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 128
+        && data.state is string && data.state.size() <= 64
+        && data.district is string && data.district.size() <= 64
+        && data.aadhaarLast4 is string && data.aadhaarLast4.size() == 4
+        && data.aadhaarHash is string && data.aadhaarHash.size() <= 128
+        && data.madhukrantiId is string && data.madhukrantiId.size() <= 64
+        && data.status == 'pending'; // Non-admin cannot self-approve
+    }
+
+    function isValidBeekeeperUpdate(data) {
+      return data.userId == existing().userId
+        && data.status == existing().status
+        && data.name is string && data.name.size() <= 128
+        && data.state is string && data.state.size() <= 64
+        && data.district is string && data.district.size() <= 64;
+    }
+
+    function isValidHive(data) {
+      return data.keys().hasAll(['id', 'hiveId', 'beekeeperId', 'hiveType', 'colonyType', 'status'])
+        && data.id is string && data.id.size() <= 128
+        && data.hiveId is string && data.hiveId.size() <= 64
+        && data.beekeeperId is string && data.beekeeperId.size() <= 32
+        && data.status in ['active', 'inactive', 'decommissioned'];
+    }
+
+    function isValidActivityLog(data) {
+      return data.keys().hasAll(['id', 'actorId', 'action', 'entityType', 'timestamp'])
+        && data.id is string && data.id.size() <= 128
+        && data.action is string && data.action.size() <= 128
+        && data.entityType is string && data.entityType.size() <= 64;
+    }
+
+    function isValidCounter(data) {
+      return data.keys().hasAll(['current'])
+        && data.current is number && data.current >= 0;
+    }
+
+    // Test connection probe
+    match /test/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Admins registry
+    match /admins/{adminId} {
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
+      allow write: if isSuperAdminEmail() || isAdmin();
+    }
+
+    // Users
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if (isOwner(userId) && isValidUser(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'beekeeperId', 'labId', 'updatedAt'])) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Beekeepers
+    match /beekeepers/{beekeeperDocId} {
+      allow get: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if true;
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid && isValidBeekeeperCreate(incoming());
+      allow update: if isAdmin() || (isSignedIn() && existing().userId == request.auth.uid && existing().status == 'pending' && isValidBeekeeperUpdate(incoming()));
+      allow delete: if isAdmin();
+    }
+
+    // Counters for Atomic ID Generation
+    match /counters/{counterId} {
+      allow get: if true;
+      allow list: if isAdmin();
+      allow create, update: if isValidCounter(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // Hives
+    match /hives/{hiveDocId} {
+      allow get, list: if true;
+      allow create: if isValidHive(incoming());
+      allow update: if isAdmin() || (incoming().hiveId == existing().hiveId);
+      allow delete: if isAdmin();
+    }
+
+    // IoT Devices
+    match /iotDevices/{deviceId} {
+      allow get, list: if true;
+      allow create, update: if true;
+      allow delete: if isAdmin();
+    }
+
+    // Sensor Readings (Time-series)
+    match /sensorReadings/{readingId} {
+      allow get, list: if true;
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    // Species Thresholds (Admin-configurable limits)
+    match /speciesThresholds/{thresholdId} {
+      allow get, list: if true;
+      allow write: if true;
+    }
+
+    // Health Alerts
+    match /healthAlerts/{alertId} {
+      allow get, list: if true;
+      allow create, update: if true;
+      allow delete: if isAdmin();
+    }
+
+    // Disease Scans (Gemini Vision AI Brood Inspection)
+    match /diseaseScans/{scanId} {
+      allow get, list: if true;
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    // Notifications
+    match /notifications/{notificationId} {
+      allow get, list: if true;
+      allow create, update: if true;
+      allow delete: if isAdmin();
+    }
+
+    // Activity Logs (Append-Only)
+    match /activityLogs/{logId} {
+      allow get, list: if true;
+      allow create: if isValidActivityLog(incoming());
+      allow update, delete: if false;
+    }
+
+    // Harvests (Beekeepers record extracted honey)
+    match /harvests/{harvestId} {
+      allow get, list: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // Batches (Aggregated honey batches with verification & lab testing state machine)
+    match /batches/{batchId} {
+      allow get, list: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // Labs (Accredited Testing Facilities)
+    match /labs/{labId} {
+      allow get, list: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // Lab Samples (Physical samples dispatched for purity analysis)
+    match /labSamples/{sampleId} {
+      allow get, list: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // Lab Reports (Purity test parameters and cryptographic hash. Strict lab-only integrity)
+    match /labReports/{reportId} {
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (
+        // Admin cannot overwrite certified test parameters
+        !existing().keys().hasAll(['reportHash']) || incoming().reportHash == existing().reportHash
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Retail Packages (Individual QR-tagged honey jars)
+    match /packages/{packageId} {
+      allow get, list: if true;
+      allow create, update: if true;
+      allow delete: if isAdmin();
+    }
+
+    // Marketplace Listings
+    match /listings/{listingId} {
+      allow get, list: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // Customer Orders
+    match /orders/{orderId} {
+      allow get, list: if true;
+      allow create, update: if true;
+      allow delete: if isAdmin();
+    }
+
+    // Beekeeper Payouts
+    match /payouts/{payoutId} {
+      allow get, list: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // Reviews & Beekeeper Replies
+    match /reviews/{reviewId} {
+      allow get, list: if true;
+      allow create, update: if true;
+      allow delete: if isAdmin();
+    }
+
+    // Trust Scores
+    match /trust_scores/{beekeeperId} {
+      allow get, list: if true;
+      allow create, update: if true;
+      allow delete: if isAdmin();
+    }
+
+    // Stock Alerts
+    match /stock_alerts/{alertId} {
+      allow get, list: if true;
+      allow create, update: if true;
+      allow delete: if isAdmin();
+    }
+
+    // Cryptographic Ledger Blocks (Strictly Append-Only, Zero Edits or Deletions Allowed)
+    match /ledgerRecords/{blockId} {
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if false; // Immutable!
+    }
+
+    // Cryptographic Ledger Head
+    match /ledger_head/{headId} {
+      allow get, list: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // Platform Settings
+    match /settings/{settingId} {
+      allow get, list: if true;
+      allow write: if isAdmin();
+    }
+
+    // Pre-computed System Analytics Stats
+    match /system_stats/{statId} {
+      allow get, list: if true;
+      allow write: if isAdmin();
+    }
+
+    // Customer Order Disputes & Refunds
+    match /disputes/{disputeId} {
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    // Comprehensive Audit Logs
+    match /audit_logs/{logId} {
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+  }
+}
