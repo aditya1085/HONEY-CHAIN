@@ -32,8 +32,13 @@ export const MyHivesView: React.FC = () => {
   const bkId = beekeeperProfile?.beekeeperId || 'BK-1001';
 
   const [hives, setHives] = useState<HiveRecord[]>(() => {
+    let local: HiveRecord[] = [];
+    try {
+      local = JSON.parse(localStorage.getItem('hc_local_hives') || '[]');
+    } catch {}
     const list = SAMPLE_DATA_MASTER.hives.filter((h) => h.beekeeperId === bkId);
-    return list.length > 0 ? list : SAMPLE_DATA_MASTER.hives.slice(0, 3);
+    const combined = [...local, ...list.filter((h) => !local.some((l) => l.hiveId === h.hiveId))];
+    return combined.length > 0 ? combined : SAMPLE_DATA_MASTER.hives.slice(0, 3);
   });
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -55,14 +60,27 @@ export const MyHivesView: React.FC = () => {
       (snapshot) => {
         const list: HiveRecord[] = [];
         snapshot.forEach((d) => list.push(d.data() as HiveRecord));
-        if (list.length > 0) {
-          list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-          setHives(list);
+        let local: HiveRecord[] = [];
+        try {
+          local = JSON.parse(localStorage.getItem('hc_local_hives') || '[]');
+        } catch {}
+        const combined = [...local, ...list.filter((h) => !local.some((l) => l.hiveId === h.hiveId))];
+        if (combined.length > 0) {
+          combined.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          setHives(combined);
         }
         setLoading(false);
       },
       (err) => {
         console.warn('MyHivesView listener notice (using master dataset):', err);
+        try {
+          const local = JSON.parse(localStorage.getItem('hc_local_hives') || '[]');
+          const list = SAMPLE_DATA_MASTER.hives.filter((h) => h.beekeeperId === bkId);
+          const combined = [...local, ...list.filter((h) => !local.some((l: any) => l.hiveId === h.hiveId))];
+          if (combined.length > 0) {
+            setHives(combined);
+          }
+        } catch {}
         setLoading(false);
       }
     );

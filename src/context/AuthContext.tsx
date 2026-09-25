@@ -47,6 +47,7 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export const SUPER_ADMIN_EMAILS = [
+  'commercial1085@gmail.com',
   'adityatripathi8989@gmail.com',
   'adityatripathi1085@gmail.com',
   'adityatripathi240815@acropolis.in',

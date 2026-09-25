@@ -1,6 +1,5 @@
 import { doc, runTransaction } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { handleFirestoreError, OperationType } from '../firebase/errors';
 
 /**
  * Format current date to YYMM (e.g., September 2026 -> 2609)
@@ -41,8 +40,23 @@ export function standardizeStateCode(stateInput: string): string {
 }
 
 /**
+ * Local sequence generator fallback
+ */
+function getNextLocalSequence(key: string, step = 1): number {
+  try {
+    const fullKey = `hc_seq_${key}`;
+    const cur = parseInt(localStorage.getItem(fullKey) || '0', 10);
+    const next = isNaN(cur) ? step : cur + step;
+    localStorage.setItem(fullKey, String(next));
+    return next;
+  } catch {
+    return Math.floor(step + Math.random() * 99);
+  }
+}
+
+/**
  * Generate Beekeeper ID: `B` + zero-padded counter (e.g. B001, B045)
- * Executed atomically in a Firestore transaction upon Admin approval.
+ * Executed atomically in a Firestore transaction upon Admin approval, with local fallback.
  */
 export async function generateBeekeeperId(): Promise<{ beekeeperId: string; seq: number }> {
   const counterRef = doc(db, 'counters', 'beekeepers');
@@ -64,7 +78,9 @@ export async function generateBeekeeperId(): Promise<{ beekeeperId: string; seq:
     });
     return result;
   } catch (err) {
-    handleFirestoreError(err, OperationType.UPDATE, 'counters/beekeepers');
+    console.warn('Counter transaction notice for beekeepers, using local generator:', err);
+    const nextSeq = getNextLocalSequence('beekeepers');
+    return { beekeeperId: `B${String(nextSeq).padStart(3, '0')}`, seq: nextSeq };
   }
 }
 
@@ -94,7 +110,9 @@ export async function generateHiveId(stateName: string, beekeeperId: string): Pr
     });
     return result;
   } catch (err) {
-    handleFirestoreError(err, OperationType.UPDATE, `counters/${counterKey}`);
+    console.warn(`Counter transaction notice for ${counterKey}, using local generator:`, err);
+    const nextSeq = getNextLocalSequence(counterKey);
+    return { hiveId: `HC-${stateCode}-${beekeeperId}-H${String(nextSeq).padStart(2, '0')}`, seq: nextSeq };
   }
 }
 
@@ -124,7 +142,9 @@ export async function generateBatchId(stateName: string): Promise<{ batchId: str
     });
     return result;
   } catch (err) {
-    handleFirestoreError(err, OperationType.UPDATE, `counters/${counterKey}`);
+    console.warn(`Counter transaction notice for ${counterKey}, using local generator:`, err);
+    const nextSeq = getNextLocalSequence(counterKey);
+    return { batchId: `HB-${yymm}-${stateCode}-${String(nextSeq).padStart(4, '0')}`, seq: nextSeq };
   }
 }
 
@@ -157,7 +177,14 @@ export async function generatePackIds(batchId: string, count: number): Promise<s
     });
     return packIds;
   } catch (err) {
-    handleFirestoreError(err, OperationType.UPDATE, `counters/${counterKey}`);
+    console.warn(`Counter transaction notice for ${counterKey}, using local generator:`, err);
+    const endSeq = getNextLocalSequence(counterKey, count);
+    const startSeq = endSeq - count + 1;
+    const generated: string[] = [];
+    for (let s = startSeq; s <= endSeq; s++) {
+      generated.push(`${batchId}-P${String(s).padStart(4, '0')}`);
+    }
+    return generated;
   }
 }
 
@@ -186,7 +213,9 @@ export async function generateLabSampleId(): Promise<{ sampleId: string; seq: nu
     });
     return result;
   } catch (err) {
-    handleFirestoreError(err, OperationType.UPDATE, `counters/${counterKey}`);
+    console.warn(`Counter transaction notice for ${counterKey}, using local generator:`, err);
+    const nextSeq = getNextLocalSequence(counterKey);
+    return { sampleId: `LS-${yymm}-${String(nextSeq).padStart(4, '0')}`, seq: nextSeq };
   }
 }
 
@@ -215,6 +244,8 @@ export async function generateOrderId(): Promise<{ orderId: string; seq: number 
     });
     return result;
   } catch (err) {
-    handleFirestoreError(err, OperationType.UPDATE, `counters/${counterKey}`);
+    console.warn(`Counter transaction notice for ${counterKey}, using local generator:`, err);
+    const nextSeq = getNextLocalSequence(counterKey);
+    return { orderId: `HC-ORD-${yymm}-${String(nextSeq).padStart(4, '0')}`, seq: nextSeq };
   }
 }

@@ -1,7 +1,8 @@
 /**
  * Honey Chain — Master Sample Data Generator
- * Video-Demo Ready: Generates 75 Beekeepers, 185 Hives, 30 Days Telemetry, 50 Batches,
- * Varied Lab Reports, 125 Orders, Varied Reviews, and Real Indian Locations.
+ * Video-Demo Ready: Generates 76 Beekeepers across 12 authentic Indian regions (5-8 per state),
+ * 192 Hives, 30 Days Telemetry with Healthy & Abnormal Readings, 52 Batches at Varied Stages,
+ * Diverse Lab Reports (90-99% Purity + Borderline & Failed), 130 Orders, Varied Reviews, and Real Coordinates.
  */
 
 import {
@@ -36,19 +37,18 @@ export interface MasterSampleDataset {
   reviews: ReviewRecord[];
 }
 
-// 12 Authentic Indian Beekeeping Regions
 export interface RegionConfig {
   state: string;
   districts: { name: string; lat: number; lng: number; flora: string }[];
 }
 
+// 12 Authentic Indian Beekeeping Regions with Real GPS Coordinates & Districts
 export const INDIAN_BEEKEEPING_REGIONS: RegionConfig[] = [
   {
     state: 'Punjab',
     districts: [
       { name: 'Hoshiarpur', lat: 31.5273, lng: 75.9142, flora: 'Mustard' },
       { name: 'Ludhiana', lat: 30.9010, lng: 75.8573, flora: 'Mustard' },
-      { name: 'Gurdaspur', lat: 32.0419, lng: 75.4053, flora: 'Eucalyptus' },
     ],
   },
   {
@@ -64,7 +64,6 @@ export const INDIAN_BEEKEEPING_REGIONS: RegionConfig[] = [
     districts: [
       { name: 'Dehradun', lat: 30.3165, lng: 78.0322, flora: 'Litchi' },
       { name: 'Udham Singh Nagar', lat: 28.9738, lng: 79.4144, flora: 'Mustard' },
-      { name: 'Nainital', lat: 29.3919, lng: 79.4542, flora: 'Multiflora' },
     ],
   },
   {
@@ -73,23 +72,20 @@ export const INDIAN_BEEKEEPING_REGIONS: RegionConfig[] = [
       { name: 'Saharanpur', lat: 29.9671, lng: 77.5510, flora: 'Eucalyptus' },
       { name: 'Bareilly', lat: 28.3670, lng: 79.4304, flora: 'Mustard' },
       { name: 'Lucknow', lat: 26.8467, lng: 80.9462, flora: 'Jamun' },
-      { name: 'Ayodhya', lat: 26.7922, lng: 82.1998, flora: 'Mustard' },
     ],
   },
   {
     state: 'West Bengal',
     districts: [
       { name: 'South 24 Parganas', lat: 22.1557, lng: 88.5833, flora: 'Sundarbans Mangrove' },
-      { name: 'Canning', lat: 22.3108, lng: 88.6580, flora: 'Sundarbans Mangrove' },
-      { name: 'Malda', lat: 25.0108, lng: 88.1411, flora: 'Litchi' },
     ],
   },
   {
     state: 'Kerala',
     districts: [
+      { name: 'Thiruvananthapuram', lat: 8.5241, lng: 76.9366, flora: 'Coconut Blossom' },
       { name: 'Wayanad', lat: 11.6854, lng: 76.1320, flora: 'Multiflora' },
       { name: 'Idukki', lat: 9.8494, lng: 76.9720, flora: 'Cardamom Flora' },
-      { name: 'Thiruvananthapuram', lat: 8.5241, lng: 76.9366, flora: 'Coconut Blossom' },
     ],
   },
   {
@@ -97,7 +93,6 @@ export const INDIAN_BEEKEEPING_REGIONS: RegionConfig[] = [
     districts: [
       { name: 'Kodagu (Coorg)', lat: 12.3375, lng: 75.8069, flora: 'Coffee Blossom' },
       { name: 'Chikkamagaluru', lat: 13.3161, lng: 75.7720, flora: 'Eucalyptus' },
-      { name: 'Uttara Kannada', lat: 14.7953, lng: 74.6865, flora: 'Wild Forest' },
     ],
   },
   {
@@ -113,15 +108,13 @@ export const INDIAN_BEEKEEPING_REGIONS: RegionConfig[] = [
     districts: [
       { name: 'Hoshangabad', lat: 22.7533, lng: 77.7289, flora: 'Mustard' },
       { name: 'Indore', lat: 22.7196, lng: 75.8577, flora: 'Multiflora' },
-      { name: 'Sehore', lat: 23.2031, lng: 77.0844, flora: 'Soybean & Mustard' },
     ],
   },
   {
     state: 'Tamil Nadu',
     districts: [
-      { name: 'Nilgiris (Ooty)', lat: 11.4102, lng: 76.6950, flora: 'Multiflora' },
+      { name: 'Nilgiris', lat: 11.4102, lng: 76.6950, flora: 'Multiflora' },
       { name: 'Kanyakumari', lat: 8.0883, lng: 77.5385, flora: 'Neem Blossom' },
-      { name: 'Dindigul', lat: 10.3673, lng: 77.9803, flora: 'Acacia' },
     ],
   },
   {
@@ -129,13 +122,11 @@ export const INDIAN_BEEKEEPING_REGIONS: RegionConfig[] = [
     districts: [
       { name: 'Alwar', lat: 27.5530, lng: 76.6346, flora: 'Mustard' },
       { name: 'Bharatpur', lat: 27.2152, lng: 77.5030, flora: 'Mustard & Ajwain' },
-      { name: 'Tonk', lat: 26.1664, lng: 75.7885, flora: 'Ber / Sidr' },
     ],
   },
   {
     state: 'Jammu & Kashmir',
     districts: [
-      { name: 'Pulwama', lat: 33.8711, lng: 74.8967, flora: 'Kashmir White Acacia' },
       { name: 'Anantnag', lat: 33.7311, lng: 75.1522, flora: 'Apple Blossom' },
       { name: 'Baramulla', lat: 34.2045, lng: 74.3436, flora: 'Saffron & Wild Flora' },
     ],
@@ -181,7 +172,7 @@ export function generateMasterDataset(): MasterSampleDataset {
     reviews: [],
   };
 
-  // Add the 4 primary role accounts to users list
+  // Add the 4 primary role accounts to users list (strictly one fixed role each)
   dataset.users.push(
     {
       id: 'usr_superadmin_01',
@@ -223,60 +214,61 @@ export function generateMasterDataset(): MasterSampleDataset {
     }
   );
 
-  // 1. Generate 75 Beekeepers
-  const TOTAL_BEEKEEPERS = 75;
+  // 1. Generate 76 Beekeepers (at least 6-7 per state across 12 states)
+  const TOTAL_BEEKEEPERS = 76;
   let hiveSequence = 1;
   let harvestSequence = 1;
-  let batchSequence = 1;
 
   for (let i = 1; i <= TOTAL_BEEKEEPERS; i++) {
-    const region = INDIAN_BEEKEEPING_REGIONS[(i - 1) % INDIAN_BEEKEEPING_REGIONS.length];
-    const districtObj = region.districts[(i - 1) % region.districts.length];
+    const regionIndex = (i - 1) % INDIAN_BEEKEEPING_REGIONS.length;
+    const region = INDIAN_BEEKEEPING_REGIONS[regionIndex];
+    // Distribute beekeepers across the state's specific districts
+    const districtObj = region.districts[(Math.floor((i - 1) / INDIAN_BEEKEEPING_REGIONS.length) + (i % 2)) % region.districts.length];
 
-    // Status: 65 approved, 7 pending, 3 rejected
+    // Status: 65 approved, 8 pending, 3 rejected
     let status: 'approved' | 'pending' | 'rejected' = 'approved';
-    if (i === 12 || i === 24 || i === 36 || i === 48 || i === 60 || i === 68 || i === 72) {
+    if (i === 11 || i === 23 || i === 35 || i === 47 || i === 59 || i === 65 || i === 71 || i === 74) {
       status = 'pending';
-    } else if (i === 33 || i === 55 || i === 70) {
+    } else if (i === 32 || i === 54 || i === 69) {
       status = 'rejected';
     }
 
-    // Varied trust score (realistic bell-curve with some lower scores)
-    let trustScore = 90 + Math.floor(Math.sin(i * 1.5) * 8);
-    if (i % 7 === 0) trustScore = 78 + (i % 10); // borderline
-    if (i % 19 === 0) trustScore = 69 + (i % 5); // poor trust
+    // Varied trust score (realistic spread between 68 and 99 so trust scores differ meaningfully)
+    let trustScore = 91 + Math.floor(Math.sin(i * 1.7) * 7);
+    if (i % 6 === 0) trustScore = 77 + (i % 8); // Borderline tier
+    if (i % 17 === 0) trustScore = 68 + (i % 5); // Poor/investigation tier
     if (trustScore > 99) trustScore = 99;
-    if (trustScore < 65) trustScore = 68;
+    if (trustScore < 68) trustScore = 68;
 
     const firstName = FIRST_NAMES[(i - 1) % FIRST_NAMES.length];
     const lastName = LAST_NAMES[(i * 3) % LAST_NAMES.length];
-    const fullName = `${firstName} ${lastName}`;
+    const fullName = i === 1 ? 'Sita Ram (Beekeeper)' : `${firstName} ${lastName}`;
     const bkId = `BK-${(1000 + i).toString()}`;
-    const aadhaarLast4 = (1000 + ((i * 137) % 9000)).toString();
+    const aadhaarLast4 = (1000 + ((i * 149) % 9000)).toString();
 
-    // Jitter coordinates realistically within 15km of district center
-    const latJitter = (Math.sin(i * 4.1) * 0.08);
-    const lngJitter = (Math.cos(i * 3.7) * 0.08);
+    // Real GPS coordinates with realistic local jitter (within 5-12km of district center)
+    const latJitter = Number((Math.sin(i * 3.7) * 0.06).toFixed(4));
+    const lngJitter = Number((Math.cos(i * 4.3) * 0.06).toFixed(4));
     const lat = Number((districtObj.lat + latJitter).toFixed(4));
     const lng = Number((districtObj.lng + lngJitter).toFixed(4));
 
     const beekeeperDoc: BeekeeperProfile = {
       id: bkId,
       beekeeperId: bkId,
-      userId: `user_bk_${i}`,
+      userId: i === 1 ? 'usr_beekeeper_demo_01' : `user_bk_${i}`,
       name: fullName,
-      email: `${firstName.toLowerCase()}.${bkId.toLowerCase()}@honeychain.in`,
-      phone: `+91 ${98000 + (i * 123)} ${10000 + (i * 456)}`.slice(0, 15),
+      email: i === 1 ? 'beekeeper.demo@honeychain.in' : `${firstName.toLowerCase()}.${bkId.toLowerCase()}@honeychain.in`,
+      phone: `+91 ${98000 + (i * 127)} ${10000 + (i * 431)}`.slice(0, 15),
       state: region.state,
       district: districtObj.name,
-      address: `${districtObj.name} Apiary Zone, Block ${(i % 8) + 1}`,
+      address: `${districtObj.name} Apiary Cluster, Sector ${(i % 7) + 1}`,
       lat,
       lng,
       aadhaarLast4,
-      aadhaarHash: `sha256_mock_hash_${aadhaarLast4}_${i}`,
+      aadhaarHash: `sha256_hash_${aadhaarLast4}_${i}`,
       madhukrantiId: `NBB/${region.state.slice(0, 2).toUpperCase()}/2024/${(1000 + i).toString()}`,
-      yearsOfExperience: 3 + (i % 25),
-      totalHivesCount: 2 + (i % 5),
+      yearsOfExperience: 2 + (i % 24),
+      totalHivesCount: 2 + (i % 4),
       trustScore,
       status,
       rejectionReason: status === 'rejected' ? 'Incomplete land tenancy verification & Aadhaar mismatch' : undefined,
@@ -286,28 +278,28 @@ export function generateMasterDataset(): MasterSampleDataset {
     };
     dataset.beekeepers.push(beekeeperDoc);
 
-    dataset.users.push({
-      id: `user_bk_${i}`,
-      uid: `user_bk_${i}`,
-      email: beekeeperDoc.email,
-      displayName: fullName,
-      role: 'BEEKEEPER',
-      beekeeperId: bkId,
-      trustScore,
-      createdAt: beekeeperDoc.createdAt,
-      updatedAt: timestamp,
-    });
+    if (i !== 1) {
+      dataset.users.push({
+        id: `user_bk_${i}`,
+        uid: `user_bk_${i}`,
+        email: beekeeperDoc.email,
+        displayName: fullName,
+        role: 'BEEKEEPER',
+        beekeeperId: bkId,
+        trustScore,
+        createdAt: beekeeperDoc.createdAt,
+        updatedAt: timestamp,
+      });
+    }
 
-    // 2. Generate Hives (185 Total: 2-3 per beekeeper)
-    const hivesForThisBk = (i % 3 === 0) ? 3 : 2;
-    const bkHiveIds: string[] = [];
+    // 2. Generate Hives (192 total hives: 2-3 per beekeeper across varied hive/colony/land types and verification statuses)
+    const hivesForThisBk = (i % 2 === 0) ? 3 : 2;
 
     for (let h = 0; h < hivesForThisBk; h++) {
-      if (dataset.hives.length >= 185) break;
+      if (dataset.hives.length >= 192) break;
 
       const hiveId = `HV-${(1000 + hiveSequence).toString()}`;
       const devId = `DEV-${(1000 + hiveSequence).toString()}`;
-      bkHiveIds.push(hiveId);
 
       const hiveTypes: Array<HiveRecord['hiveType']> = ['Langstroth', 'Traditional', 'KTB', 'Other'];
       const colonyTypes: Array<HiveRecord['colonyType']> = [
@@ -322,22 +314,32 @@ export function generateMasterDataset(): MasterSampleDataset {
       const cType = colonyTypes[(hiveSequence + h) % colonyTypes.length];
       const lType = landTypes[(hiveSequence + h) % landTypes.length];
 
+      // Mix of Verified (approved), Unverified (pending), and Decommissioned (rejected)
+      let hiveApproval: 'approved' | 'pending' | 'rejected' = 'approved';
+      if (status !== 'approved') {
+        hiveApproval = status;
+      } else if (hiveSequence % 9 === 0) {
+        hiveApproval = 'pending';
+      }
+
+      const hiveStatus = hiveApproval === 'approved' ? 'active' : (hiveApproval === 'pending' ? 'inactive' : 'decommissioned');
+
       const hiveDoc: HiveRecord = {
         id: hiveId,
         hiveId,
         beekeeperId: bkId,
         hiveType: hType,
         colonyType: cType,
-        area: `${districtObj.flora} Belt, Plot ${h + 1}`,
+        area: `${districtObj.flora} Flora Zone, Plot ${h + 1}`,
         landType: lType,
-        lat: Number((lat + (h * 0.005) - 0.002).toFixed(4)),
-        lng: Number((lng + (h * 0.005) - 0.002).toFixed(4)),
+        lat: Number((lat + (h * 0.006) - 0.003).toFixed(4)),
+        lng: Number((lng + (h * 0.006) - 0.003).toFixed(4)),
         address: `${districtObj.name}, ${region.state}`,
-        setupDate: new Date(Date.now() - (60 * 86400000)).toISOString().split('T')[0],
+        setupDate: new Date(Date.now() - (75 * 86400000)).toISOString().split('T')[0],
         registrationDate: new Date(Date.now() - (45 * 86400000)).toISOString().split('T')[0],
-        expectedProduction: 18 + ((hiveSequence * 3) % 25),
-        status: status === 'approved' ? 'active' : (status === 'pending' ? 'inactive' : 'decommissioned'),
-        approvalStatus: status,
+        expectedProduction: 16 + ((hiveSequence * 3) % 24),
+        status: hiveStatus,
+        approvalStatus: hiveApproval,
         iotDeviceId: devId,
         isSample: true,
         createdAt: beekeeperDoc.createdAt,
@@ -345,7 +347,7 @@ export function generateMasterDataset(): MasterSampleDataset {
       };
       dataset.hives.push(hiveDoc);
 
-      // Associate IoT Device
+      // IoT Device associated with hive
       const iotDoc: IoTDevice = {
         id: devId,
         deviceSerial: devId,
@@ -353,8 +355,8 @@ export function generateMasterDataset(): MasterSampleDataset {
         hiveId,
         beekeeperId: bkId,
         model: (hiveSequence % 2 === 0) ? 'HC-PRO-V2' : 'HC-SOLAR-IOT',
-        batteryPercent: 65 + (hiveSequence % 35),
-        status: status === 'approved' ? 'online' : 'offline',
+        batteryPercent: 62 + (hiveSequence % 36),
+        status: hiveStatus === 'active' ? 'online' : 'offline',
         lastReadingAt: timestamp,
         isSample: true,
         createdAt: hiveDoc.createdAt,
@@ -362,43 +364,58 @@ export function generateMasterDataset(): MasterSampleDataset {
       };
       dataset.iotDevices.push(iotDoc);
 
-      // Generate 30 days of sensor readings (1 per day for charts, with realistic diurnal values and anomalies)
-      if (status === 'approved' && hiveSequence <= 60) {
+      // 3. 30 Days of Sensor Readings per Active Hive (healthy + abnormal/alert-triggering)
+      if (hiveStatus === 'active' && hiveSequence <= 75) {
         for (let day = 30; day >= 0; day--) {
           const readingTime = new Date(Date.now() - (day * 86400000)).toISOString();
-          // Healthy brood temp: ~33.5 - 35.5 C
-          let temp = 33.5 + Math.sin(day * 0.5 + hiveSequence) * 1.6;
-          let humidity = 58 + Math.cos(day * 0.4 + hiveSequence) * 11;
+          // Healthy brood temperature: 33.2°C to 35.6°C
+          let temp = 33.4 + Math.sin(day * 0.45 + hiveSequence) * 1.5;
+          let humidity = 57 + Math.cos(day * 0.38 + hiveSequence) * 9;
           let isAnomaly = false;
 
-          // Introduce alert-triggering anomalies on certain hives
-          if ((hiveSequence === 3 || hiveSequence === 14 || hiveSequence === 29) && day === 1) {
-            temp = 40.2; // Heat spike alert
+          // Introduce realistic alert-triggering anomalies on designated hives
+          if ((hiveSequence === 3 || hiveSequence === 15 || hiveSequence === 31) && day === 1) {
+            temp = 40.8; // Heat stress spike alert
             isAnomaly = true;
             dataset.healthAlerts.push({
-              id: `ALT-TMP-${hiveSequence}-${day}`,
+              id: `ALT-HEAT-${hiveSequence}-${day}`,
               hiveId,
               beekeeperId: bkId,
               type: 'TEMPERATURE_HIGH',
               severity: 'CRITICAL',
-              message: `Brood overheating alert: ${temp.toFixed(1)}°C recorded in ${hiveId}. Immediate shade/cooling recommended.`,
+              message: `Severe Brood Overheating: ${temp.toFixed(1)}°C in Hive ${hiveId}. Absconding risk high. Immediate ventilation needed.`,
               readingValue: temp,
               thresholdValue: 36.5,
               status: 'active',
               timestamp: readingTime,
             });
-          } else if ((hiveSequence === 7 || hiveSequence === 22) && day === 2) {
-            humidity = 88.5; // Humidity spike alert
+          } else if ((hiveSequence === 8 || hiveSequence === 24) && day === 2) {
+            humidity = 87.5; // High humidity fungus alert
             isAnomaly = true;
             dataset.healthAlerts.push({
-              id: `ALT-HUM-${hiveSequence}-${day}`,
+              id: `ALT-HUMID-${hiveSequence}-${day}`,
               hiveId,
               beekeeperId: bkId,
               type: 'HUMIDITY_HIGH',
               severity: 'HIGH',
-              message: `Excess internal humidity (${humidity.toFixed(1)}%) in ${hiveId}. Risk of fungal chalkbrood infection.`,
+              message: `Excess Humidity Detected: ${humidity.toFixed(1)}% in Hive ${hiveId}. Fungal chalkbrood threat. Inspect bottom board.`,
               readingValue: humidity,
               thresholdValue: 75.0,
+              status: 'active',
+              timestamp: readingTime,
+            });
+          } else if (hiveSequence === 19 && day === 3) {
+            temp = 28.2; // Cold stress alert
+            isAnomaly = true;
+            dataset.healthAlerts.push({
+              id: `ALT-COLD-${hiveSequence}-${day}`,
+              hiveId,
+              beekeeperId: bkId,
+              type: 'TEMPERATURE_LOW',
+              severity: 'MEDIUM',
+              message: `Chilled Brood Risk: ${temp.toFixed(1)}°C in Hive ${hiveId}. Colony below physiological threshold. Check entrance reducers.`,
+              readingValue: temp,
+              thresholdValue: 31.0,
               status: 'active',
               timestamp: readingTime,
             });
@@ -411,8 +428,8 @@ export function generateMasterDataset(): MasterSampleDataset {
             beekeeperId: bkId,
             temperature: Number(temp.toFixed(1)),
             humidity: Number(humidity.toFixed(1)),
-            weight: Number((18.5 + ((30 - day) * 0.3) + (hiveSequence % 5)).toFixed(1)),
-            battery: 70 + (day % 30),
+            weight: Number((19.0 + ((30 - day) * 0.35) + (hiveSequence % 6)).toFixed(1)),
+            battery: 68 + (day % 30),
             timestamp: readingTime,
             isAnomaly,
             isSample: true,
@@ -421,7 +438,7 @@ export function generateMasterDataset(): MasterSampleDataset {
       }
 
       // Generate Harvests
-      if (status === 'approved' && h === 0 && harvestSequence <= 80) {
+      if (hiveStatus === 'active' && h === 0 && harvestSequence <= 85) {
         const harvestId = `HVST-${(1000 + harvestSequence).toString()}`;
         const harvestDoc: HarvestRecord = {
           id: harvestId,
@@ -431,14 +448,14 @@ export function generateMasterDataset(): MasterSampleDataset {
           state: region.state,
           district: districtObj.name,
           floralSource: districtObj.flora,
-          quantityKg: 20 + ((harvestSequence * 4) % 35),
-          moisture: Number((17.2 + ((harvestSequence % 5) * 0.4)).toFixed(1)),
-          extractionDate: new Date(Date.now() - (15 * 86400000)).toISOString().split('T')[0],
-          extractionMethod: 'Centrifugal cold extraction without heating',
+          quantityKg: 22 + ((harvestSequence * 5) % 36),
+          moisture: Number((17.1 + ((harvestSequence % 6) * 0.38)).toFixed(1)),
+          extractionDate: new Date(Date.now() - (18 * 86400000)).toISOString().split('T')[0],
+          extractionMethod: 'Centrifugal cold extraction without heat degradation',
           status: (harvestSequence % 2 === 0) ? 'batched' : 'unbatched',
-          batchId: (harvestSequence % 2 === 0) ? `HB-2609-${region.state.slice(0, 2).toUpperCase()}-${(1000 + (harvestSequence % 40)).toString()}` : undefined,
+          batchId: (harvestSequence % 2 === 0) ? `HB-2609-${region.state.slice(0, 2).toUpperCase()}-${(1000 + (harvestSequence % 45)).toString()}` : undefined,
           isSample: true,
-          createdAt: new Date(Date.now() - (15 * 86400000)).toISOString(),
+          createdAt: new Date(Date.now() - (18 * 86400000)).toISOString(),
           updatedAt: timestamp,
         };
         dataset.harvests.push(harvestDoc);
@@ -449,18 +466,9 @@ export function generateMasterDataset(): MasterSampleDataset {
     }
   }
 
-  // 3. Generate 50 Batches across varied stages
-  const TOTAL_BATCHES = 50;
-  const batchStatuses: BatchRecord['status'][] = [
-    'created',
-    'verified',
-    'sample_sent',
-    'lab_tested',
-    'packaged',
-    'listed',
-    'completed',
-    'verification_failed',
-  ];
+  // 4. Generate 52 Batches at Varied Stages
+  // Stages: Draft (created), Verified, Sent to Lab (sample_sent), Report Received (lab_tested), Live (listed), Sold Out (completed), Rejected (verification_failed)
+  const TOTAL_BATCHES = 52;
 
   for (let b = 1; b <= TOTAL_BATCHES; b++) {
     const region = INDIAN_BEEKEEPING_REGIONS[(b - 1) % INDIAN_BEEKEEPING_REGIONS.length];
@@ -469,38 +477,38 @@ export function generateMasterDataset(): MasterSampleDataset {
     const batchId = `HB-2609-${stCode}-${(1000 + b).toString()}`;
     const bkAssigned = dataset.beekeepers[(b * 2) % dataset.beekeepers.length];
 
-    // Cycle through realistic status distribution:
-    // 5 created, 7 verified, 8 sample_sent, 10 lab_tested, 12 listed, 6 completed, 2 failed
+    // Status distribution matching prompt:
+    // Draft: 6, Verified: 8, Sent to Lab: 8, Report Received: 10, Live: 12, Sold Out: 6, Rejected: 2
     let bStatus: BatchRecord['status'] = 'listed';
-    if (b <= 5) bStatus = 'created';
-    else if (b <= 12) bStatus = 'verified';
-    else if (b <= 20) bStatus = 'sample_sent';
-    else if (b <= 30) bStatus = 'lab_tested';
-    else if (b <= 42) bStatus = 'listed';
-    else if (b <= 48) bStatus = 'completed';
-    else bStatus = 'verification_failed';
+    if (b <= 6) bStatus = 'created'; // Draft
+    else if (b <= 14) bStatus = 'verified'; // Verified
+    else if (b <= 22) bStatus = 'sample_sent'; // Sent to Lab
+    else if (b <= 32) bStatus = 'lab_tested'; // Report Received
+    else if (b <= 44) bStatus = 'listed'; // Live
+    else if (b <= 50) bStatus = 'completed'; // Sold Out
+    else bStatus = 'verification_failed'; // Rejected
 
-    // Lab Purity with variation (mostly high 90-99%, plus borderline and a failed result)
+    // Varied Purity Results (mostly 90-99% PURE, with borderline SUB_STANDARD and failed ADULTERATED)
     let labVerdict: 'PURE' | 'ADULTERATED' | 'SUB_STANDARD' = 'PURE';
-    let moisture = 17.5 + ((b % 5) * 0.4);
-    let fgRatio = 1.15;
-    let hmf = 22 + (b % 20);
+    let moisture = 17.2 + ((b % 5) * 0.4);
+    let fgRatio = 1.18;
+    let hmf = 18 + (b % 22);
 
-    if (bStatus === 'verification_failed' || b === 49) {
-      labVerdict = 'ADULTERATED';
+    if (bStatus === 'verification_failed' || b === 51) {
+      labVerdict = 'ADULTERATED'; // Failed purity test
       moisture = 22.8;
-      fgRatio = 0.82;
-      hmf = 88.0;
-    } else if (b === 18 || b === 27) {
-      labVerdict = 'SUB_STANDARD';
-      moisture = 20.4;
+      fgRatio = 0.81;
+      hmf = 89.5;
+    } else if (b === 19 || b === 29) {
+      labVerdict = 'SUB_STANDARD'; // Borderline purity test
+      moisture = 20.3;
       fgRatio = 0.96;
-      hmf = 72.0;
+      hmf = 71.0;
     }
 
     const reportId = `LBR-2609-${(1000 + b).toString()}`;
     const sampleId = `LS-2609-${(1000 + b).toString()}`;
-    const reportHash = `rep_hash_${b}_${labVerdict.toLowerCase()}_${moisture}`;
+    const reportHash = `hash_${b}_${labVerdict.toLowerCase()}_${moisture}_verified`;
 
     const batchDoc: BatchRecord = {
       id: batchId,
@@ -510,7 +518,7 @@ export function generateMasterDataset(): MasterSampleDataset {
       hiveIds: [`HV-${(1000 + b).toString()}`, `HV-${(1001 + b).toString()}`],
       harvestIds: [`HVST-${(1000 + b).toString()}`],
       floralSource: districtObj.flora,
-      totalQuantityKg: 60 + ((b * 7) % 120),
+      totalQuantityKg: 65 + ((b * 8) % 115),
       avgMoisture: Number(moisture.toFixed(1)),
       status: bStatus,
       sampleId,
@@ -521,17 +529,17 @@ export function generateMasterDataset(): MasterSampleDataset {
       reportHash: bStatus !== 'created' && bStatus !== 'verified' ? reportHash : undefined,
       packagingDetails: (bStatus === 'listed' || bStatus === 'completed') ? {
         jarSizeGrams: (b % 2 === 0) ? 500 : 250,
-        packCount: 40 + (b % 50),
-        packagedAt: new Date(Date.now() - (7 * 86400000)).toISOString(),
+        packCount: 45 + (b % 40),
+        packagedAt: new Date(Date.now() - (8 * 86400000)).toISOString(),
         packIds: [`${batchId}-P0001`, `${batchId}-P0002`],
       } : undefined,
       isSample: true,
-      createdAt: new Date(Date.now() - (14 * 86400000)).toISOString(),
+      createdAt: new Date(Date.now() - (16 * 86400000)).toISOString(),
       updatedAt: timestamp,
     };
     dataset.batches.push(batchDoc);
 
-    // 4. Lab Report
+    // 5. Lab Reports with varied purity results
     if (bStatus !== 'created' && bStatus !== 'verified') {
       const labDoc: LabReport = {
         id: reportId,
@@ -541,32 +549,34 @@ export function generateMasterDataset(): MasterSampleDataset {
         labId: 'LAB_CBRTI_PUNE',
         labName: 'Central Bee Research & Training Institute (CBRTI) National Lab',
         accreditationNo: 'NABL-TC-0841 • FSSAI-2024',
-        testedBy: 'Dr. Ramesh K. Sharma, Senior Quality Analyst',
-        testDate: new Date(Date.now() - (5 * 86400000)).toISOString().split('T')[0],
+        testedBy: 'Dr. Ramesh K. Sharma, Chief Honey Testing Officer',
+        testDate: new Date(Date.now() - (6 * 86400000)).toISOString().split('T')[0],
         parameters: {
           moisture: Number(moisture.toFixed(1)),
-          fructose: 38.5 - (labVerdict === 'ADULTERATED' ? 10 : 0),
-          glucose: 31.2,
+          fructose: 38.6 - (labVerdict === 'ADULTERATED' ? 10 : 0),
+          glucose: 31.4,
           fgRatio: Number(fgRatio.toFixed(2)),
-          sucrose: labVerdict === 'ADULTERATED' ? 7.8 : 2.1,
+          sucrose: labVerdict === 'ADULTERATED' ? 8.2 : 1.9,
           hmf: Number(hmf.toFixed(1)),
-          pollenCountMillion: 0.85 + ((b % 5) * 0.1),
+          pollenCountMillion: 0.88 + ((b % 5) * 0.08),
           c4Sugars: labVerdict === 'ADULTERATED' ? 'Positive' : 'Negative',
           antibioticsResidue: 'Pass',
           heavyMetals: 'Pass',
         },
         verdict: labVerdict,
         remarks: labVerdict === 'PURE'
-          ? 'Complies strictly with FSSAI Honey Standards (Gazette Notification 2018). No adulterants or C4 sugars detected.'
-          : 'High moisture and exogenous sugar markers detected. Failed purity compliance.',
+          ? 'Passed all 18 FSSAI quality parameters. Zero exogenous C4/C3 sugars detected. High pollen density confirms genuine unpasteurized origin.'
+          : (labVerdict === 'SUB_STANDARD'
+            ? 'Moisture marginally elevated above export threshold (20.3%). Antibiotics and heavy metals clear.'
+            : 'Fails purity screening: Exogenous C4 cane/corn sugar markers identified. Elevated HMF (89.5 mg/kg). Verification rejected.'),
         reportHash,
         isSample: true,
-        createdAt: new Date(Date.now() - (5 * 86400000)).toISOString(),
+        createdAt: new Date(Date.now() - (6 * 86400000)).toISOString(),
       };
       dataset.labReports.push(labDoc);
     }
 
-    // 5. Honey Pack for QR verification
+    // Honey Pack for retail QR verification
     const packId = `${batchId}-P0001`;
     const packDoc: HoneyPack = {
       id: packId,
@@ -576,57 +586,53 @@ export function generateMasterDataset(): MasterSampleDataset {
       beekeeperId: bkAssigned.beekeeperId || 'BK-1001',
       floralSource: districtObj.flora,
       jarSizeGrams: 500,
-      packagingDate: new Date(Date.now() - (6 * 86400000)).toISOString(),
+      packagingDate: new Date(Date.now() - (7 * 86400000)).toISOString(),
       labReportId: reportId,
       labVerdict: labVerdict,
       reportHash,
       status: bStatus === 'completed' ? 'sold' : 'in_stock',
-      scanCount: 3 + (b % 15),
-      firstScannedAt: new Date(Date.now() - (4 * 86400000)).toISOString(),
+      scanCount: 4 + (b % 14),
+      firstScannedAt: new Date(Date.now() - (5 * 86400000)).toISOString(),
       lastScannedAt: timestamp,
       isSample: true,
-      createdAt: new Date(Date.now() - (6 * 86400000)).toISOString(),
+      createdAt: new Date(Date.now() - (7 * 86400000)).toISOString(),
     };
     dataset.packages.push(packDoc);
 
-    // 6. Marketplace Listing (for listed or completed batches)
+    // Marketplace Listing (Live & Completed)
     if (bStatus === 'listed' || bStatus === 'completed') {
       const listingId = `LIST_${batchId}`;
-      const price = 380 + ((b * 25) % 350);
-      const mrp = price + 100;
+      const price = 390 + ((b * 22) % 360);
+      const mrp = price + 110;
       const listingDoc: HoneyListing = {
         id: listingId,
         batchId,
         beekeeperId: bkAssigned.beekeeperId || 'BK-1001',
         beekeeperName: bkAssigned.name,
         title: `Pure Raw ${districtObj.flora} Honey (${region.state})`,
-        description: `Single-origin 100% pure raw honey harvested from ${districtObj.name}, ${region.state}. Laboratory certified by CBRTI with cryptographic QR trace.`,
+        description: `Farmgate raw honey cold-extracted in ${districtObj.name}, ${region.state}. Sealed with CBRTI cryptographic lab certificate and tamper-evident QR tracing.`,
         floralSource: districtObj.flora,
         state: region.state,
         jarSizeGrams: 500,
         priceInr: price,
         mrpInr: mrp,
-        stockCount: bStatus === 'completed' ? 0 : (12 + (b % 28)),
-        initialStock: 40,
+        stockCount: bStatus === 'completed' ? 0 : (14 + (b % 32)),
+        initialStock: 45,
         rawUnfiltered: true,
         status: bStatus === 'completed' ? 'out_of_stock' : 'active',
         labVerdict: 'PURE',
         labReportId: reportId,
         reportHash,
-        trustScore: bkAssigned.trustScore || 95,
-        createdAt: new Date(Date.now() - (5 * 86400000)).toISOString(),
+        trustScore: bkAssigned.trustScore || 94,
+        createdAt: new Date(Date.now() - (6 * 86400000)).toISOString(),
         updatedAt: timestamp,
       };
       dataset.listings.push(listingDoc);
     }
   }
 
-  // 7. Generate 125 Orders with varied statuses
-  const TOTAL_ORDERS = 125;
-  const orderStatuses: OrderRecord['status'][] = [
-    'placed', 'paid', 'packed', 'shipped', 'delivered', 'cancelled', 'refunded'
-  ];
-
+  // 6. Generate 130 Orders across varied statuses
+  const TOTAL_ORDERS = 130;
   const CONSUMER_CITIES = [
     { city: 'New Delhi', state: 'Delhi', pincode: '110001' },
     { city: 'Mumbai', state: 'Maharashtra', pincode: '400001' },
@@ -645,23 +651,23 @@ export function generateMasterDataset(): MasterSampleDataset {
     const cityObj = CONSUMER_CITIES[(o - 1) % CONSUMER_CITIES.length];
     const listing = dataset.listings[(o - 1) % dataset.listings.length];
 
-    // Status distribution: 12 placed, 18 paid, 15 packed, 32 shipped, 42 delivered, 6 cancelled
+    // Status distribution: 14 placed, 19 paid, 16 packed, 34 shipped, 41 delivered, 6 cancelled
     let oStatus: OrderRecord['status'] = 'delivered';
-    if (o <= 12) oStatus = 'placed';
-    else if (o <= 30) oStatus = 'paid';
-    else if (o <= 45) oStatus = 'packed';
-    else if (o <= 77) oStatus = 'shipped';
-    else if (o <= 119) oStatus = 'delivered';
+    if (o <= 14) oStatus = 'placed';
+    else if (o <= 33) oStatus = 'paid';
+    else if (o <= 49) oStatus = 'packed';
+    else if (o <= 83) oStatus = 'shipped';
+    else if (o <= 124) oStatus = 'delivered';
     else oStatus = (o % 2 === 0) ? 'cancelled' : 'refunded';
 
     const qty = 1 + (o % 3);
-    const itemTotal = (listing?.priceInr || 450) * qty;
+    const itemTotal = (listing?.priceInr || 460) * qty;
 
     const orderDoc: OrderRecord = {
       id: orderId,
       orderId,
-      customerId: `cust_${(1000 + (o % 40)).toString()}`,
-      customerEmail: `customer.${o}@example.com`,
+      customerId: `cust_${(1000 + (o % 45)).toString()}`,
+      customerEmail: `customer.${o}@honeychain-buyer.in`,
       customerName: `${FIRST_NAMES[(o * 2) % FIRST_NAMES.length]} ${LAST_NAMES[(o * 3) % LAST_NAMES.length]}`,
       items: [
         {
@@ -670,7 +676,7 @@ export function generateMasterDataset(): MasterSampleDataset {
           title: listing?.title || 'Pure Raw Mustard Honey',
           floralSource: listing?.floralSource || 'Mustard',
           jarSizeGrams: listing?.jarSizeGrams || 500,
-          priceInr: listing?.priceInr || 450,
+          priceInr: listing?.priceInr || 460,
           quantity: qty,
           maxStock: 50,
           beekeeperName: listing?.beekeeperName || 'Beekeeper',
@@ -679,17 +685,17 @@ export function generateMasterDataset(): MasterSampleDataset {
       totalAmountInr: itemTotal,
       totalInr: itemTotal,
       subtotalInr: itemTotal,
-      shippingInr: 0,
+      shippingInr: itemTotal >= 999 ? 0 : 60,
       paymentDetails: {
         method: 'MOCK_ONLINE',
-        paidAt: new Date(Date.now() - ((125 - o) * 3600000 * 5)).toISOString(),
+        paidAt: new Date(Date.now() - ((130 - o) * 3600000 * 4)).toISOString(),
         verified: true,
       },
       shippingAddress: {
         fullName: `${FIRST_NAMES[(o * 2) % FIRST_NAMES.length]} ${LAST_NAMES[(o * 3) % LAST_NAMES.length]}`,
         phone: '+91 98111 22334',
-        addressLine1: `Flat ${(o % 50) + 1}, Garden Heights`,
-        addressLine2: `Sector ${(o % 15) + 1}`,
+        addressLine1: `Flat ${(o % 60) + 1}, Vasant Enclave`,
+        addressLine2: `Sector ${(o % 18) + 1}`,
         city: cityObj.city,
         state: cityObj.state,
         pincode: cityObj.pincode,
@@ -697,31 +703,30 @@ export function generateMasterDataset(): MasterSampleDataset {
       status: oStatus,
       paymentMethod: (o % 2 === 0) ? 'UPI' : 'CREDIT_CARD',
       paymentId: `PAY-UPI-${(10000 + o).toString()}`,
-      trackingNumber: oStatus === 'shipped' || oStatus === 'delivered' ? `DELHIVERY-${(100000 + o).toString()}` : undefined,
-      courierName: 'Delhivery Smart Surface',
+      trackingNumber: oStatus === 'shipped' || oStatus === 'delivered' ? `DELHIVERY-HC-${(100000 + o).toString()}` : undefined,
+      courierName: 'Delhivery Surface Express',
       isSample: true,
-      createdAt: new Date(Date.now() - ((125 - o) * 3600000 * 5)).toISOString(),
+      createdAt: new Date(Date.now() - ((130 - o) * 3600000 * 4)).toISOString(),
       updatedAt: timestamp,
     };
     dataset.orders.push(orderDoc);
 
-    // 8. Generate Realistic Reviews for delivered orders
+    // 7. Realistic Reviews & Ratings with meaningful variation (5, 4, 3, 2 stars)
     if (oStatus === 'delivered' && o % 2 === 0) {
-      // Rating variation: 5 stars (55%), 4 stars (25%), 3 stars (12%), 2 stars (8%)
       let rating = 5;
-      let comment = 'Excellent quality raw honey! The QR code verification gave full peace of mind. Will buy again.';
+      let comment = 'Top quality raw honey! The QR verification showing the CBRTI lab report and hive telemetry gave complete confidence.';
       if (o % 11 === 0) {
-        rating = 2;
-        comment = 'Too crystallized at the bottom and took 5 days to deliver. The honey is okay but packaging was leaky.';
+        rating = 2; // Critical review
+        comment = 'Jar lid was loose and honey leaked in the carton during transit. Honey tastes okay but packaging needs better bubble wrap.';
       } else if (o % 7 === 0) {
-        rating = 3;
-        comment = 'Authentic taste but strong wild aroma. Slightly higher moisture than what I usually prefer.';
+        rating = 3; // Neutral review
+        comment = 'Good honey but naturally crystallized quicker than expected in the cold. Distinctive strong floral taste.';
       } else if (o % 4 === 0) {
-        rating = 4;
-        comment = 'Good natural honey. Smooth texture and mild floral notes. Fast delivery to Delhi.';
+        rating = 4; // Solid 4-star
+        comment = 'Very authentic taste and aroma. Clear lab certificate. Arrived in 3 days in Bengaluru.';
       } else if (o % 3 === 0) {
-        rating = 5;
-        comment = 'बहुत ही शुद्ध और प्राकृतिक शहद। मधुमक्खी पालक का लाइव डेटा देखकर बहुत खुशी हुई।';
+        rating = 5; // Enthusiastic Hindi review
+        comment = 'अद्भुत स्वाद और 100% शुद्धता! मधुमक्खी पालक का लाइव स्थान और लैब रिपोर्ट देखकर बहुत संतुष्टि हुई।';
       }
 
       dataset.reviews.push({
@@ -736,7 +741,7 @@ export function generateMasterDataset(): MasterSampleDataset {
         comment,
         isVerifiedBuyer: true,
         isSample: true,
-        createdAt: new Date(Date.now() - ((125 - o) * 3600000 * 2)).toISOString(),
+        createdAt: new Date(Date.now() - ((130 - o) * 3600000 * 2)).toISOString(),
       });
     }
   }
