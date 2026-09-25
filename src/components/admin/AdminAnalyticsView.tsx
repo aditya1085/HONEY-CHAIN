@@ -415,7 +415,7 @@ export const AdminAnalyticsView: React.FC = () => {
             </span>
           </div>
         </div>
-        <IndiaHivesMap hives={SAMPLE_DATA_MASTER.hives} beekeepers={SAMPLE_DATA_MASTER.beekeepers} />
+        <IndiaHivesMap hives={SAMPLE_DATA_MASTER.hives} beekeepers={SAMPLE_DATA_MASTER.beekeepers} role="ADMIN" />
       </div>
 
       {/* Multi-Dimensional Filter Bar */}

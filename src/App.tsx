@@ -37,6 +37,9 @@ import { UserManagementView } from './components/admin/UserManagementView';
 import { PlatformSettingsView } from './components/admin/PlatformSettingsView';
 import { AdminDataManager } from './components/admin/AdminDataManager';
 import { StateDistrictSearch } from './components/common/StateDistrictSearch';
+import { ConsumerAnalyticsView } from './components/consumer/ConsumerAnalyticsView';
+import { ConsumerMapView } from './components/consumer/ConsumerMapView';
+import { LabAnalyticsView } from './components/lab/LabAnalyticsView';
 import { BeeAssistantWidget } from './components/common/BeeAssistantWidget';
 import { seedPhase3Data } from './services/seedPhase3';
 import { seedPhase4Data } from './services/seedPhase4';
@@ -508,6 +511,37 @@ const MainContent: React.FC = () => {
               setSelectedBatchId(bId);
               setCurrentTab('batches');
             }}
+          />
+        )}
+
+        {/* Consumer Dedicated Honey Map */}
+        {currentTab === 'consumer-map' && (
+          <ConsumerMapView
+            onNavigateToMarketplace={() => setCurrentTab('marketplace')}
+            onSelectBatch={(bId) => {
+              setSelectedBatchId(bId);
+              setCurrentTab('batches');
+            }}
+          />
+        )}
+
+        {/* Consumer Dedicated Purity Analytics & AI Insights */}
+        {currentTab === 'consumer-analytics' && (
+          <ConsumerAnalyticsView
+            onNavigateToMarketplace={() => setCurrentTab('marketplace')}
+            onAddToCart={handleAddToCart}
+            onSelectBatch={(bId) => {
+              setSelectedBatchId(bId);
+              setCurrentTab('batches');
+            }}
+          />
+        )}
+
+        {/* Lab Dedicated Analytics & Quality Trends */}
+        {currentTab === 'lab-analytics' && (
+          <LabAnalyticsView
+            labId="LAB_CBRTI_PUNE"
+            initialTab="charts"
           />
         )}
           </>

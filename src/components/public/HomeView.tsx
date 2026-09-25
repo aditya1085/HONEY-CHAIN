@@ -12,6 +12,7 @@ import { db } from '../../firebase/config';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { SAMPLE_DATA_MASTER } from '../../services/sampleDataMaster';
+import { IndiaHivesMap } from '../common/IndiaHivesMap';
 
 interface HomeViewProps {
   onNavigate: (tab: string) => void;
@@ -241,6 +242,28 @@ export const HomeView: React.FC<HomeViewProps> = ({
             </button>
           </div>
         </div>
+      </section>
+
+      {/* Live Pan-India Honey Traceability Map */}
+      <section className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <span>Live Pan-India Honey Traceability Map</span>
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Explore 190+ IoT-monitored apiaries, inspect colony health, and trace batches back to genuine beekeepers across 12 states.
+            </p>
+          </div>
+          <button
+            onClick={() => onNavigate('search-region')}
+            className="text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 self-start sm:self-auto"
+          >
+            <span>Open Regional Explorer</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        <IndiaHivesMap role="CONSUMER" heightClass="h-[480px]" />
       </section>
 
       {/* Reusable Camera & QR Quick Bar */}

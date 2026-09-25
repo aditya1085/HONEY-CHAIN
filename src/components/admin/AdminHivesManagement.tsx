@@ -151,7 +151,7 @@ export const AdminHivesManagement: React.FC = () => {
       </div>
 
       {/* Interactive India Leaflet Geo-Telemetry Map */}
-      <IndiaHivesMap hives={hives} beekeepers={SAMPLE_DATA_MASTER.beekeepers} />
+      <IndiaHivesMap hives={hives} beekeepers={SAMPLE_DATA_MASTER.beekeepers} role="ADMIN" />
 
       {sweepResult && (
         <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs font-semibold animate-in fade-in">

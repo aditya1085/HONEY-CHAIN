@@ -127,6 +127,35 @@ export const Header: React.FC<HeaderProps> = ({
             <span>Search State/District</span>
           </button>
 
+          {/* Consumer Dedicated Scoped Map and Analytics/Insights */}
+          {activeRole === 'CONSUMER' && (
+            <>
+              <button
+                onClick={() => setCurrentTab('consumer-map')}
+                className={`px-2.5 py-1.5 rounded-xl transition flex items-center gap-1.5 ${
+                  currentTab === 'consumer-map'
+                    ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <MapPin className="w-3.5 h-3.5 text-amber-500" />
+                <span>Honey Map</span>
+              </button>
+
+              <button
+                onClick={() => setCurrentTab('consumer-analytics')}
+                className={`px-2.5 py-1.5 rounded-xl transition flex items-center gap-1.5 ${
+                  currentTab === 'consumer-analytics'
+                    ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <TrendingUp className="w-3.5 h-3.5 text-amber-500" />
+                <span>Purity & AI Insights</span>
+              </button>
+            </>
+          )}
+
           {/* Beekeeper Links */}
           {(activeRole === 'BEEKEEPER' || activeRole === 'ADMIN') && (
             <>

@@ -17,6 +17,8 @@ import { generateLabReportPdf } from '../../services/pdfService';
 import { useLanguage } from '../../context/LanguageContext';
 import { SAMPLE_DATA_MASTER } from '../../services/sampleDataMaster';
 import { StateDistrictSearch } from '../common/StateDistrictSearch';
+import { IndiaHivesMap } from '../common/IndiaHivesMap';
+import { LabAnalyticsView } from './LabAnalyticsView';
 import {
   FlaskConical,
   CheckCircle2,
@@ -32,6 +34,8 @@ import {
   Sparkles,
   Lock,
   MapPin,
+  TrendingUp,
+  Search,
 } from 'lucide-react';
 
 interface LabPortalProps {
@@ -87,8 +91,8 @@ export const LabPortal: React.FC<LabPortalProps> = ({ currentUserId, userRole })
   const [reports, setReports] = useState<Record<string, LabReport>>(INITIAL_REPORTS_MAP);
   const [loading, setLoading] = useState<boolean>(false);
 
-  // Tab mode: Testing Queue vs State/District Regional Search
-  const [activeLabTab, setActiveLabTab] = useState<'queue' | 'regional_search'>('queue');
+  // Tab mode: Testing Queue vs Map vs Analytics vs AI Insights vs State/District Search
+  const [activeLabTab, setActiveLabTab] = useState<'queue' | 'map' | 'analytics' | 'ai_insights' | 'regional_search'>('queue');
 
   // Form State for Recording Report
   const [showTestModal, setShowTestModal] = useState<boolean>(false);
@@ -380,33 +384,80 @@ export const LabPortal: React.FC<LabPortalProps> = ({ currentUserId, userRole })
       )}
 
       {/* Lab Sub-navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2">
+      <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2 overflow-x-auto">
         <button
           onClick={() => setActiveLabTab('queue')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs font-bold transition whitespace-nowrap ${
             activeLabTab === 'queue'
               ? 'bg-teal-600 text-white shadow-sm'
               : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
           }`}
         >
           <FlaskConical className="w-4 h-4" />
-          <span>Samples Queue & Test Certification ({samples.length})</span>
+          <span>Samples Queue ({samples.length})</span>
         </button>
 
         <button
-          onClick={() => setActiveLabTab('regional_search')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition ${
-            activeLabTab === 'regional_search'
+          onClick={() => setActiveLabTab('map')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs font-bold transition whitespace-nowrap ${
+            activeLabTab === 'map'
               ? 'bg-teal-600 text-white shadow-sm'
               : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
           }`}
         >
           <MapPin className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-          <span>Search by State / District (Territory Lab Reports & Purity)</span>
+          <span>Testing Origin Map</span>
+        </button>
+
+        <button
+          onClick={() => setActiveLabTab('analytics')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs font-bold transition whitespace-nowrap ${
+            activeLabTab === 'analytics'
+              ? 'bg-teal-600 text-white shadow-sm'
+              : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+          }`}
+        >
+          <TrendingUp className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+          <span>Turnaround & Quality Charts</span>
+        </button>
+
+        <button
+          onClick={() => setActiveLabTab('ai_insights')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs font-bold transition whitespace-nowrap ${
+            activeLabTab === 'ai_insights'
+              ? 'bg-teal-600 text-white shadow-sm'
+              : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+          <span>AI Quality Patterns</span>
+        </button>
+
+        <button
+          onClick={() => setActiveLabTab('regional_search')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs font-bold transition whitespace-nowrap ${
+            activeLabTab === 'regional_search'
+              ? 'bg-teal-600 text-white shadow-sm'
+              : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+          }`}
+        >
+          <Search className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+          <span>State / District Audit</span>
         </button>
       </div>
 
-      {activeLabTab === 'regional_search' ? (
+      {activeLabTab === 'map' ? (
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl bg-teal-500/10 border border-teal-500/20 text-xs text-teal-900 dark:text-teal-200">
+            <strong>Geographic Honey Testing Scope:</strong> Displaying origin apiaries and honey batches assigned for NABL purity validation. Filter by state or district to evaluate regional compliance.
+          </div>
+          <IndiaHivesMap role="LAB" heightClass="h-[540px]" />
+        </div>
+      ) : activeLabTab === 'analytics' ? (
+        <LabAnalyticsView labId={activeLab?.id} initialTab="charts" />
+      ) : activeLabTab === 'ai_insights' ? (
+        <LabAnalyticsView labId={activeLab?.id} initialTab="ai_insights" />
+      ) : activeLabTab === 'regional_search' ? (
         <StateDistrictSearch role="LAB" />
       ) : (
         <>

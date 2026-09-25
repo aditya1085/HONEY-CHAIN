@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { fetchRegionalSearchData, RegionalSearchResult, RegionalLabReportResult } from '../../services/regionalSearchService';
 import { useLanguage } from '../../context/LanguageContext';
+import { IndiaHivesMap } from './IndiaHivesMap';
 
 export interface StateDistrictSearchProps {
   role: 'CONSUMER' | 'ADMIN' | 'LAB' | 'BEEKEEPER';
@@ -189,6 +190,24 @@ export const StateDistrictSearch: React.FC<StateDistrictSearchProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Interactive India Hives Map with Universal Search & Spatial Clustering */}
+      <IndiaHivesMap
+        role={role}
+        initialSearchQuery={selectedDistrict ? `${selectedDistrict}, ${selectedState}` : selectedState}
+        onSelectState={(st) => {
+          setSelectedState(st);
+          setSelectedDistrict('');
+        }}
+        onSelectDistrict={(st, dist) => {
+          setSelectedState(st);
+          setSelectedDistrict(dist);
+        }}
+        onSelectBatch={(bId) => {
+          if (onSelectBatch) onSelectBatch(bId);
+        }}
+        heightClass="h-[480px]"
+      />
 
       {/* 4 Primary Summary Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
