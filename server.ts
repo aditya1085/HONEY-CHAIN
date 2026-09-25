@@ -1,4 +1,5 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
+import type { Request, Response } from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
 import crypto from 'crypto';
@@ -20,30 +21,54 @@ import {
   orderBy,
   limit,
 } from 'firebase/firestore';
-import firebaseConfig from './firebase-applet-config.json';
-import { generateMasterDataset, SAMPLE_DATA_MASTER } from './src/services/sampleDataMaster';
+import fs from 'fs';
+
+// Safely load firebase config without import attribute requirement
+let firebaseConfig: any = {};
+try {
+  const cfgPath = path.resolve('firebase-applet-config.json');
+  if (fs.existsSync(cfgPath)) {
+    firebaseConfig = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
+  }
+} catch (e) {
+  console.warn('[Server] Could not read firebase-applet-config.json:', e);
+}
+
+import { generateMasterDataset, SAMPLE_DATA_MASTER } from './src/services/sampleDataMaster.mjs';
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT || '3000', 10);
 
 app.use(express.json({ limit: '15mb' }));
 
-// Initialize Firebase for server-side persistence
-const fbApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const dbId = (firebaseConfig as { firestoreDatabaseId?: string }).firestoreDatabaseId;
-const db = dbId && dbId !== '(default)' ? getFirestore(fbApp, dbId) : getFirestore(fbApp);
+// Initialize Firebase for server-side persistence safely
+let fbApp: any = null;
+let db: any = null;
+try {
+  fbApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+  const dbId = (firebaseConfig as { firestoreDatabaseId?: string })?.firestoreDatabaseId;
+  db = dbId && dbId !== '(default)' ? getFirestore(fbApp, dbId) : getFirestore(fbApp);
+} catch (err) {
+  console.warn('[Server] Firebase client initialization warning:', err);
+}
 
-// Initialize Gemini Client
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
+// Initialize Gemini Client safely
+let ai: GoogleGenAI;
+try {
+  ai = new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY || '',
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
     },
-  },
-});
+  });
+} catch (err) {
+  console.warn('[Server] Gemini client initialization warning:', err);
+  ai = new GoogleGenAI({ apiKey: '' });
+}
 
 // Default species thresholds (seeded if not in DB)
 const DEFAULT_SPECIES_THRESHOLDS: Record<string, { tempMin: number; tempMax: number; humidityMin: number; humidityMax: number }> = {
@@ -3596,25 +3621,46 @@ app.post('/api/sensor-simulator/tick', async (req: Request, res: Response) => {
 ========================================================================= */
 
 async function startServer() {
-  if (process.env.NODE_ENV !== 'production') {
-    const { createServer } = await import('vite');
-    const vite = await createServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
+  const isProduction = process.env.NODE_ENV === 'production' || fs.existsSync(path.resolve('dist/index.html'));
+
+  if (isProduction) {
+    console.log('[Honey Chain] Production mode active: serving static bundle from dist/');
     app.use(express.static('dist'));
     app.get('*', (req: Request, res: Response) => {
       res.sendFile(path.resolve('dist/index.html'));
     });
+  } else {
+    try {
+      console.log('[Honey Chain] Development mode active: mounting Vite middleware');
+      const { createServer } = await import('vite');
+      const vite = await createServer({
+        server: { middlewareMode: true },
+        appType: 'spa',
+      });
+      app.use(vite.middlewares);
+    } catch (viteErr) {
+      console.warn('[Honey Chain] Vite dev middleware failed, checking for dist fallback:', viteErr);
+      if (fs.existsSync(path.resolve('dist/index.html'))) {
+        app.use(express.static('dist'));
+        app.get('*', (req: Request, res: Response) => {
+          res.sendFile(path.resolve('dist/index.html'));
+        });
+      }
+    }
   }
 
-  app.listen(Number(PORT), '0.0.0.0', () => {
-    console.log(`[Honey Chain] Full-Stack server running on http://0.0.0.0:${PORT}`);
+  const portNumber = parseInt(process.env.PORT || '3000', 10);
+  const server = app.listen(portNumber, '0.0.0.0', () => {
+    console.log(`[Honey Chain] Full-Stack server running on http://0.0.0.0:${portNumber} (PID: ${process.pid}, isProduction: ${isProduction})`);
+  });
+
+  server.on('error', (err: any) => {
+    console.error('[Honey Chain] Server listen error:', err);
+    process.exit(1);
   });
 }
 
 startServer().catch((err) => {
   console.error('Failed to start server:', err);
+  process.exit(1);
 });
