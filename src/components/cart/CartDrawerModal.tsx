@@ -57,6 +57,19 @@ export const CartDrawerModal: React.FC<CartDrawerModalProps> = ({
   const [processing, setProcessing] = useState<boolean>(false);
   const [checkoutError, setCheckoutError] = useState<string>('');
   const [completedOrder, setCompletedOrder] = useState<OrderRecord | null>(null);
+  const [isPaymentsConfigured, setIsPaymentsConfigured] = useState<boolean>(false);
+
+  // Check payment gateway status on mount
+  React.useEffect(() => {
+    fetch('/api/checkout/config')
+      .then((res) => res.json())
+      .then((data) => {
+        setIsPaymentsConfigured(Boolean(data?.isConfigured));
+      })
+      .catch(() => {
+        setIsPaymentsConfigured(false);
+      });
+  }, []);
 
   if (!isOpen) return null;
 
@@ -107,19 +120,27 @@ export const CartDrawerModal: React.FC<CartDrawerModalProps> = ({
       const mockPaymentId = `pay_test_${Math.random().toString(36).substring(2, 10)}`;
       const mockSignature = `sig_test_${Math.random().toString(36).substring(2, 12)}`;
 
-      const verifyResp = await fetch('/api/checkout/verify-signature', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          razorpayOrderId: razorpay.orderId,
-          razorpayPaymentId: mockPaymentId,
-          razorpaySignature: mockSignature,
-        }),
-      });
+      try {
+        const verifyResp = await fetch('/api/checkout/verify-signature', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            razorpayOrderId: razorpay?.orderId || `sim_${Date.now()}`,
+            razorpayPaymentId: mockPaymentId,
+            razorpaySignature: mockSignature,
+          }),
+        });
 
-      const verifyData = await verifyResp.json();
-      if (!verifyData.success || !verifyData.verified) {
-        throw new Error('Payment signature verification failed');
+        const verifyData = await verifyResp.json();
+        if (!verifyData.success && isPaymentsConfigured) {
+          throw new Error('Payment signature verification failed');
+        }
+      } catch (verifyErr) {
+        if (isPaymentsConfigured) {
+          throw verifyErr;
+        }
+        // In placeholder mode, ignore signature verify failure to prevent crash
+        console.info('[Checkout] Gateway in placeholder mode, continuing simulated order');
       }
 
       const now = new Date().toISOString();
@@ -163,6 +184,7 @@ export const CartDrawerModal: React.FC<CartDrawerModalProps> = ({
           method: paymentMethod,
           paidAt: now,
           verified: true,
+          isSimulated: !isPaymentsConfigured,
         },
         tracking: {
           courierName: 'India Post Speed Post / DTDC Express',
@@ -434,21 +456,38 @@ export const CartDrawerModal: React.FC<CartDrawerModalProps> = ({
             </form>
           )}
 
-          {/* STEP 3: RAZORPAY PAYMENT SIMULATION */}
+          {/* STEP 3: PAYMENT METHOD */}
           {step === 'payment' && (
             <div className="space-y-4">
+              {/* Payments Not Configured Notice */}
+              {!isPaymentsConfigured && (
+                <div className="rounded-2xl border border-amber-300 bg-amber-50/90 dark:border-amber-700/60 dark:bg-amber-950/40 p-4 space-y-1.5">
+                  <div className="flex items-center gap-2 font-bold text-xs text-amber-900 dark:text-amber-200">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                    <span>Payments not configured yet</span>
+                  </div>
+                  <p className="text-xs text-amber-800/90 dark:text-amber-300/80 leading-relaxed">
+                    Live Razorpay payment keys are not set yet (using safe placeholder values). You can still test the entire workflow with <strong>Cash on Delivery (COD)</strong> or place a <strong>simulated test order</strong> without any charges.
+                  </p>
+                </div>
+              )}
+
               <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4 dark:border-blue-900/40 dark:bg-blue-950/20 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 font-bold text-xs text-blue-900 dark:text-blue-200">
                     <CreditCard className="h-4 w-4 text-blue-600" />
-                    <span>Razorpay Test Gateway (SHA-256 Verified)</span>
+                    <span>{isPaymentsConfigured ? 'Razorpay Online Gateway' : 'Razorpay Gateway (Simulated)'}</span>
                   </div>
-                  <span className="rounded-full bg-blue-200 px-2 py-0.5 text-[10px] font-bold text-blue-900">
-                    TEST MODE
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    isPaymentsConfigured ? 'bg-emerald-200 text-emerald-900' : 'bg-amber-200 text-amber-900'
+                  }`}>
+                    {isPaymentsConfigured ? 'LIVE GATEWAY' : 'TEST MODE'}
                   </span>
                 </div>
                 <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                  Simulates full UPI, NetBanking, and Card authorization with HMAC-SHA256 signature verification.
+                  {isPaymentsConfigured
+                    ? 'Authorized UPI, NetBanking, and Card transactions with HMAC-SHA256 signature verification.'
+                    : 'Safe test simulation mode with placeholder keys (rzp_test_placeholder).'}
                 </p>
               </div>
 
@@ -464,9 +503,21 @@ export const CartDrawerModal: React.FC<CartDrawerModalProps> = ({
                 >
                   <div className="flex items-center gap-2.5">
                     <CreditCard className="h-4 w-4 text-amber-600" />
-                    <span className="font-bold text-zinc-800 dark:text-zinc-200">
-                      Razorpay Online (UPI / Card / NetBanking)
-                    </span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-zinc-800 dark:text-zinc-200">
+                          Razorpay Online (UPI / Card / NetBanking)
+                        </span>
+                        {!isPaymentsConfigured && (
+                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-800 dark:bg-amber-900/60 dark:text-amber-300">
+                            Payments not configured yet
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-zinc-500">
+                        {!isPaymentsConfigured ? 'Safe test payment simulation' : 'Instant online verification'}
+                      </p>
+                    </div>
                   </div>
                   <span className="h-4 w-4 rounded-full border border-amber-600 flex items-center justify-center">
                     {paymentMethod === 'RAZORPAY_TEST' && (
@@ -485,9 +536,14 @@ export const CartDrawerModal: React.FC<CartDrawerModalProps> = ({
                 >
                   <div className="flex items-center gap-2.5">
                     <Truck className="h-4 w-4 text-zinc-500" />
-                    <span className="font-bold text-zinc-800 dark:text-zinc-200">
-                      Cash on Delivery (COD)
-                    </span>
+                    <div>
+                      <span className="font-bold text-zinc-800 dark:text-zinc-200 block">
+                        Cash on Delivery (COD)
+                      </span>
+                      <span className="text-[11px] text-zinc-500">
+                        Pay cash upon receiving certified jar consignment
+                      </span>
+                    </div>
                   </div>
                   <span className="h-4 w-4 rounded-full border border-zinc-400 flex items-center justify-center">
                     {paymentMethod === 'COD_TEST' && (
@@ -521,22 +577,41 @@ export const CartDrawerModal: React.FC<CartDrawerModalProps> = ({
 
               <div>
                 <h3 className="text-lg font-black text-zinc-900 dark:text-zinc-100">
-                  Payment Verified & Order Confirmed!
+                  {completedOrder.paymentDetails.method === 'COD_TEST'
+                    ? 'Order Placed (Cash on Delivery)!'
+                    : !isPaymentsConfigured
+                    ? 'Order Confirmed (Test Simulation)!'
+                    : 'Payment Verified & Order Confirmed!'}
                 </h3>
                 <p className="text-xs text-zinc-500 mt-1 font-mono">
                   Order ID: {completedOrder.orderId}
                 </p>
+                {!isPaymentsConfigured && completedOrder.paymentDetails.method !== 'COD_TEST' && (
+                  <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1">
+                    Payments not configured yet — placed in safe simulation mode.
+                  </p>
+                )}
               </div>
 
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 text-xs text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 space-y-2 text-left">
                 <div className="flex justify-between">
                   <span>Payment Status:</span>
-                  <strong className="font-bold">PAID (₹{completedOrder.totalInr})</strong>
+                  <strong className="font-bold">
+                    {completedOrder.paymentDetails.method === 'COD_TEST'
+                      ? `PENDING AT DELIVERY (₹${completedOrder.totalInr})`
+                      : !isPaymentsConfigured
+                      ? `SIMULATED TEST MODE (₹${completedOrder.totalInr})`
+                      : `PAID (₹${completedOrder.totalInr})`}
+                  </strong>
                 </div>
                 <div className="flex justify-between">
-                  <span>Razorpay Reference:</span>
+                  <span>Payment Gateway:</span>
                   <strong className="font-mono text-[11px]">
-                    {completedOrder.paymentDetails.razorpayPaymentId}
+                    {completedOrder.paymentDetails.method === 'COD_TEST'
+                      ? 'Cash on Delivery'
+                      : !isPaymentsConfigured
+                      ? 'Razorpay (Simulated Test Key)'
+                      : completedOrder.paymentDetails.razorpayPaymentId}
                   </strong>
                 </div>
                 <div className="flex justify-between">
@@ -634,7 +709,15 @@ export const CartDrawerModal: React.FC<CartDrawerModalProps> = ({
                   className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-amber-500 py-2.5 text-xs font-bold text-white shadow-md shadow-amber-500/20 hover:bg-amber-600 disabled:opacity-50 transition"
                 >
                   <Lock className="h-3.5 w-3.5" />
-                  <span>{processing ? 'Verifying Signature...' : `Pay ₹${totalInr}`}</span>
+                  <span>
+                    {processing
+                      ? 'Processing...'
+                      : paymentMethod === 'COD_TEST'
+                      ? `Place COD Order (₹${totalInr})`
+                      : !isPaymentsConfigured
+                      ? `Place Test Order (₹${totalInr})`
+                      : `Pay ₹${totalInr}`}
+                  </span>
                 </button>
               </div>
             )}

@@ -6,6 +6,7 @@ import { handleFirestoreError, OperationType } from '../../firebase/errors';
 import { useAuth } from '../../context/AuthContext';
 import { generateHiveId } from '../../services/idGenerators';
 import { logActivity } from '../../services/activityLogger';
+import { recordLedgerBlock } from '../../services/blockchainService';
 import { HiveRecord, HiveType, ColonyType, LandType } from '../../types';
 import { CameraCapture, CapturedPhoto } from '../camera/CameraCapture';
 import { PrintableHiveSticker } from './PrintableHiveSticker';
@@ -117,7 +118,22 @@ export const AddHiveModal: React.FC<AddHiveModalProps> = ({ isOpen, onClose, onS
       // 2. Persist to Firestore
       await setDoc(doc(db, 'hives', docId), hiveData);
 
-      // 3. Log Activity
+      // 3. Anchor Hive registration onto Cryptographic / Polygon Amoy Ledger
+      try {
+        await recordLedgerBlock('HIVE_REGISTERED', hiveId, {
+          beekeeperId: bkId,
+          colonyType,
+          hiveType,
+          area: area.trim(),
+          lat,
+          lng,
+          registrationDate: hiveData.registrationDate,
+        });
+      } catch (ledgerErr) {
+        console.warn('Ledger block anchoring warning (continuing):', ledgerErr);
+      }
+
+      // 4. Log Activity
       await logActivity({
         action: 'HIVE_REGISTERED',
         entityType: 'HIVE',

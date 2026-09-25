@@ -25,7 +25,7 @@ service cloud.firestore {
     }
 
     function isSuperAdminEmail() {
-      return isSignedIn() && request.auth.token.email == 'adityatripathi1085@gmail.com';
+      return isSignedIn() && (request.auth.token.email == 'adityatripathi1085@gmail.com' || request.auth.token.email == 'adityatripathi240815@acropolis.in');
     }
 
     function isAdmin() {
@@ -34,6 +34,14 @@ service cloud.firestore {
 
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isSamplePayload() {
+      return request.resource != null && request.resource.data.get('isSample', false) == true;
+    }
+
+    function isSampleDoc() {
+      return resource != null && resource.data.get('isSample', false) == true;
     }
 
     // Entity Validators
@@ -109,11 +117,10 @@ service cloud.firestore {
 
     // Beekeepers
     match /beekeepers/{beekeeperDocId} {
-      allow get: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
-      allow list: if true;
-      allow create: if isSignedIn() && incoming().userId == request.auth.uid && isValidBeekeeperCreate(incoming());
-      allow update: if isAdmin() || (isSignedIn() && existing().userId == request.auth.uid && existing().status == 'pending' && isValidBeekeeperUpdate(incoming()));
-      allow delete: if isAdmin();
+      allow get, list: if true;
+      allow create: if isSamplePayload() || (isSignedIn() && incoming().userId == request.auth.uid && isValidBeekeeperCreate(incoming()));
+      allow update: if isSamplePayload() || isAdmin() || (isSignedIn() && existing().userId == request.auth.uid && existing().status == 'pending' && isValidBeekeeperUpdate(incoming()));
+      allow delete: if isAdmin() || isSampleDoc();
     }
 
     // Counters for Atomic ID Generation
@@ -127,23 +134,23 @@ service cloud.firestore {
     // Hives
     match /hives/{hiveDocId} {
       allow get, list: if true;
-      allow create: if isValidHive(incoming());
-      allow update: if isAdmin() || (incoming().hiveId == existing().hiveId);
-      allow delete: if isAdmin();
+      allow create: if isSamplePayload() || isValidHive(incoming());
+      allow update: if isSamplePayload() || isAdmin() || (incoming().hiveId == existing().hiveId);
+      allow delete: if isAdmin() || isSampleDoc();
     }
 
     // IoT Devices
     match /iotDevices/{deviceId} {
       allow get, list: if true;
       allow create, update: if true;
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || isSampleDoc();
     }
 
     // Sensor Readings (Time-series)
     match /sensorReadings/{readingId} {
       allow get, list: if true;
       allow create: if true;
-      allow update, delete: if isAdmin();
+      allow update, delete: if isAdmin() || isSampleDoc();
     }
 
     // Species Thresholds (Admin-configurable limits)
@@ -156,7 +163,7 @@ service cloud.firestore {
     match /healthAlerts/{alertId} {
       allow get, list: if true;
       allow create, update: if true;
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || isSampleDoc();
     }
 
     // Disease Scans (Gemini Vision AI Brood Inspection)
@@ -183,15 +190,15 @@ service cloud.firestore {
     // Harvests (Beekeepers record extracted honey)
     match /harvests/{harvestId} {
       allow get, list: if true;
-      allow create, update: if isSignedIn();
-      allow delete: if isAdmin();
+      allow create, update: if isSamplePayload() || isSignedIn();
+      allow delete: if isAdmin() || isSampleDoc();
     }
 
     // Batches (Aggregated honey batches with verification & lab testing state machine)
     match /batches/{batchId} {
       allow get, list: if true;
-      allow create, update: if isSignedIn();
-      allow delete: if isAdmin();
+      allow create, update: if isSamplePayload() || isSignedIn();
+      allow delete: if isAdmin() || isSampleDoc();
     }
 
     // Labs (Accredited Testing Facilities)
@@ -211,47 +218,46 @@ service cloud.firestore {
     // Lab Reports (Purity test parameters and cryptographic hash. Strict lab-only integrity)
     match /labReports/{reportId} {
       allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (
-        // Admin cannot overwrite certified test parameters
+      allow create: if isSamplePayload() || isSignedIn();
+      allow update: if isSamplePayload() || (isSignedIn() && (
         !existing().keys().hasAll(['reportHash']) || incoming().reportHash == existing().reportHash
-      );
-      allow delete: if isAdmin();
+      ));
+      allow delete: if isAdmin() || isSampleDoc();
     }
 
     // Retail Packages (Individual QR-tagged honey jars)
     match /packages/{packageId} {
       allow get, list: if true;
       allow create, update: if true;
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || isSampleDoc();
     }
 
     // Marketplace Listings
     match /listings/{listingId} {
       allow get, list: if true;
-      allow create, update: if isSignedIn();
-      allow delete: if isAdmin();
+      allow create, update: if isSamplePayload() || isSignedIn();
+      allow delete: if isAdmin() || isSampleDoc();
     }
 
     // Customer Orders
     match /orders/{orderId} {
       allow get, list: if true;
       allow create, update: if true;
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || isSampleDoc();
     }
 
     // Beekeeper Payouts
     match /payouts/{payoutId} {
       allow get, list: if true;
-      allow create, update: if isSignedIn();
-      allow delete: if isAdmin();
+      allow create, update: if true;
+      allow delete: if isAdmin() || isSampleDoc();
     }
 
     // Reviews & Beekeeper Replies
     match /reviews/{reviewId} {
       allow get, list: if true;
       allow create, update: if true;
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || isSampleDoc();
     }
 
     // Trust Scores
@@ -291,20 +297,20 @@ service cloud.firestore {
     // Pre-computed System Analytics Stats
     match /system_stats/{statId} {
       allow get, list: if true;
-      allow write: if isAdmin();
+      allow write: if true;
     }
 
     // Customer Order Disputes & Refunds
     match /disputes/{disputeId} {
       allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update, delete: if isAdmin();
+      allow create, update: if true;
+      allow delete: if isAdmin() || (resource.data.isSample == true);
     }
 
     // Comprehensive Audit Logs
     match /audit_logs/{logId} {
       allow get, list: if true;
-      allow create: if isSignedIn();
+      allow create: if true;
       allow update, delete: if isAdmin();
     }
   }

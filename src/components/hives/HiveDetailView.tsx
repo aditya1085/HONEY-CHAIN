@@ -217,7 +217,12 @@ export const HiveDetailView: React.FC<HiveDetailViewProps> = ({ hive, onBack }) 
 
   // Download CSV
   const handleExportCsv = () => {
-    window.open(`/api/iot/export-csv/${hive.hiveId}`, '_blank');
+    const link = document.createElement('a');
+    link.href = `/api/iot/export-csv/${hive.hiveId}`;
+    link.download = `iot_readings_${hive.hiveId}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const latestReading = readings[readings.length - 1];

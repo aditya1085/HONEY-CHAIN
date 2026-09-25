@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, ShieldCheck, Camera, QrCode, Store, Package } from 'lucide-react';
+import { Home, ShieldCheck, Camera, QrCode, Store, Package, TrendingUp } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 
@@ -31,18 +31,32 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         <span className="text-[10px]">Shop</span>
       </button>
 
-      {/* Beekeeper Hub or Register */}
-      <button
-        onClick={() => setCurrentTab(beekeeperProfile ? 'my-hives' : 'beekeeper-register')}
-        className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition ${
-          currentTab === 'my-hives' || currentTab === 'beekeeper-register' || currentTab === 'beekeeper-dashboard'
-            ? 'text-amber-600 dark:text-amber-400 font-bold'
-            : 'text-slate-500 dark:text-slate-400'
-        }`}
-      >
-        <ShieldCheck className="w-5 h-5" />
-        <span className="text-[10px]">{beekeeperProfile ? 'Hives' : 'Register'}</span>
-      </button>
+      {/* Beekeeper Hub or Admin Hub */}
+      {activeRole === 'ADMIN' ? (
+        <button
+          onClick={() => setCurrentTab('admin-analytics')}
+          className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition ${
+            currentTab.startsWith('admin')
+              ? 'text-amber-600 dark:text-amber-400 font-bold'
+              : 'text-slate-500 dark:text-slate-400'
+          }`}
+        >
+          <TrendingUp className="w-5 h-5" />
+          <span className="text-[10px]">Admin</span>
+        </button>
+      ) : (
+        <button
+          onClick={() => setCurrentTab(beekeeperProfile ? 'my-hives' : 'beekeeper-register')}
+          className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition ${
+            currentTab === 'my-hives' || currentTab === 'beekeeper-register' || currentTab === 'beekeeper-dashboard'
+              ? 'text-amber-600 dark:text-amber-400 font-bold'
+              : 'text-slate-500 dark:text-slate-400'
+          }`}
+        >
+          <ShieldCheck className="w-5 h-5" />
+          <span className="text-[10px]">{beekeeperProfile ? 'Hives' : 'Register'}</span>
+        </button>
+      )}
 
       {/* Camera Capture Action */}
       <button

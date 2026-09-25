@@ -750,8 +750,28 @@ app.post('/api/lab/compute-report-hash', (req: Request, res: Response) => {
    PHASE 4 API ROUTES: CHECKOUT, RAZORPAY WEBHOOK/SIGNATURE & TRUST SCORE
 ========================================================================= */
 
-const RAZORPAY_TEST_SECRET = process.env.RAZORPAY_KEY_SECRET || 'honey_chain_rzp_secret_2026';
-const RAZORPAY_TEST_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_honeychain2026';
+const RAZORPAY_TEST_SECRET = process.env.RAZORPAY_KEY_SECRET || 'placeholder_secret';
+const RAZORPAY_TEST_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder';
+
+const isRazorpayConfigured = Boolean(
+  process.env.RAZORPAY_KEY_ID &&
+  process.env.RAZORPAY_KEY_SECRET &&
+  process.env.RAZORPAY_KEY_ID !== 'rzp_test_placeholder' &&
+  !process.env.RAZORPAY_KEY_ID.includes('placeholder') &&
+  process.env.RAZORPAY_KEY_SECRET !== 'placeholder_secret' &&
+  !process.env.RAZORPAY_KEY_SECRET.includes('placeholder')
+);
+
+/**
+ * GET /api/checkout/config
+ * Returns payment gateway configuration status
+ */
+app.get('/api/checkout/config', (_req: Request, res: Response) => {
+  res.json({
+    isConfigured: isRazorpayConfigured,
+    keyId: isRazorpayConfigured ? RAZORPAY_TEST_KEY_ID : 'rzp_test_placeholder',
+  });
+});
 
 /**
  * POST /api/checkout/create-order
@@ -816,6 +836,7 @@ app.post('/api/checkout/create-order', async (req: Request, res: Response) => {
         orderId: razorpayOrderId,
         amount: totalInr * 100, // in paise
         currency: 'INR',
+        isConfigured: isRazorpayConfigured,
       },
     });
   } catch (err) {
@@ -834,6 +855,12 @@ app.post('/api/checkout/verify-signature', (req: Request, res: Response) => {
 
     if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
       res.status(400).json({ error: 'Missing payment signature verification arguments' });
+      return;
+    }
+
+    // When placeholder keys are used, gracefully simulate successful signature verification
+    if (!isRazorpayConfigured) {
+      res.json({ success: true, verified: true, mockMode: true });
       return;
     }
 
@@ -2201,8 +2228,8 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, () => {
-    console.log(`[Honey Chain] Full-Stack server running on port ${PORT}`);
+  app.listen(Number(PORT), '0.0.0.0', () => {
+    console.log(`[Honey Chain] Full-Stack server running on http://0.0.0.0:${PORT}`);
   });
 }
 

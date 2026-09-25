@@ -122,6 +122,18 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       };
 
       await setDoc(doc(db, 'reviews', reviewId), newReview);
+
+      // Trigger automatic Trust Score recomputation
+      try {
+        await fetch('/api/trust-score/recompute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ beekeeperId: listing.beekeeperId }),
+        });
+      } catch (trustErr) {
+        console.warn('Trust score recomputation trigger warning:', trustErr);
+      }
+
       setReviewComment('');
       setSubmittingReview(false);
     } catch (err) {

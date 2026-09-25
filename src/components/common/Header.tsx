@@ -16,6 +16,12 @@ import {
   Store,
   FileCheck2,
   Package,
+  TrendingUp,
+  Database,
+  ShieldAlert,
+  Users,
+  Settings,
+  Activity,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -47,6 +53,7 @@ export const Header: React.FC<HeaderProps> = ({
   const { theme, toggleTheme } = useTheme();
 
   const [roleMenuOpen, setRoleMenuOpen] = useState(false);
+  const [adminMenuOpen, setAdminMenuOpen] = useState(false);
 
   const roles: Array<{ role: UserRole; label: string }> = [
     { role: 'CONSUMER', label: t('role.consumer') },
@@ -202,48 +209,142 @@ export const Header: React.FC<HeaderProps> = ({
           {activeRole === 'ADMIN' && (
             <>
               <button
-                onClick={() => setCurrentTab('harvest-pool')}
-                className={`px-2.5 py-1.5 rounded-xl transition ${
-                  currentTab === 'harvest-pool'
+                onClick={() => setCurrentTab('admin-analytics')}
+                className={`px-2.5 py-1.5 rounded-xl transition flex items-center gap-1.5 ${
+                  currentTab === 'admin-analytics'
                     ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold'
                     : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                {t('nav.harvestPool')}
+                <TrendingUp className="w-3.5 h-3.5 text-amber-500" />
+                <span>{t('nav.analytics')}</span>
               </button>
 
               <button
-                onClick={() => setCurrentTab('payouts')}
-                className={`px-2.5 py-1.5 rounded-xl transition ${
-                  currentTab === 'payouts'
+                onClick={() => setCurrentTab('admin-data')}
+                className={`px-2.5 py-1.5 rounded-xl transition flex items-center gap-1.5 ${
+                  currentTab === 'admin-data'
                     ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold'
                     : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                Payouts & Trust
+                <Database className="w-3.5 h-3.5 text-blue-500" />
+                <span>Data Manager</span>
               </button>
 
-              <button
-                onClick={() => setCurrentTab('admin-queue')}
-                className={`px-2.5 py-1.5 rounded-xl transition ${
-                  currentTab === 'admin-queue'
-                    ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold'
-                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                {t('nav.approvalQueue')}
-              </button>
+              {/* Admin Console Dropdown for All Phase 1-5 Modules */}
+              <div className="relative">
+                <button
+                  onClick={() => setAdminMenuOpen(!adminMenuOpen)}
+                  className={`px-2.5 py-1.5 rounded-xl transition flex items-center gap-1 ${
+                    [
+                      'admin-queue',
+                      'admin-moderation',
+                      'admin-users',
+                      'admin-settings',
+                      'activity-logs',
+                      'payouts',
+                      'harvest-pool',
+                      'ledger-explorer',
+                      'species-thresholds',
+                      'admin-hives',
+                    ].includes(currentTab)
+                      ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <span>Admin Console</span>
+                  <ChevronDown className="w-3 h-3" />
+                </button>
 
-              <button
-                onClick={() => setCurrentTab('ledger-explorer')}
-                className={`px-2.5 py-1.5 rounded-xl transition ${
-                  currentTab === 'ledger-explorer'
-                    ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold'
-                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                {t('nav.ledgerExplorer')}
-              </button>
+                {adminMenuOpen && (
+                  <div className="absolute left-0 mt-2 w-56 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 py-2 z-50 text-xs animate-in fade-in space-y-0.5">
+                    <div className="px-3 py-1 text-[10px] uppercase font-bold text-slate-400">
+                      Operations & Control:
+                    </div>
+                    <button
+                      onClick={() => {
+                        setCurrentTab('admin-queue');
+                        setAdminMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-amber-500/10 flex items-center gap-2 text-slate-700 dark:text-slate-200"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
+                      <span>{t('nav.approvalQueue')}</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setCurrentTab('admin-moderation');
+                        setAdminMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-amber-500/10 flex items-center gap-2 text-slate-700 dark:text-slate-200"
+                    >
+                      <ShieldAlert className="w-3.5 h-3.5 text-red-500" />
+                      <span>Moderation & Disputes</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setCurrentTab('admin-users');
+                        setAdminMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-amber-500/10 flex items-center gap-2 text-slate-700 dark:text-slate-200"
+                    >
+                      <Users className="w-3.5 h-3.5 text-blue-500" />
+                      <span>User Management</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setCurrentTab('payouts');
+                        setAdminMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-amber-500/10 flex items-center gap-2 text-slate-700 dark:text-slate-200"
+                    >
+                      <Store className="w-3.5 h-3.5 text-purple-500" />
+                      <span>Payouts & Trust Score</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setCurrentTab('harvest-pool');
+                        setAdminMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-amber-500/10 flex items-center gap-2 text-slate-700 dark:text-slate-200"
+                    >
+                      <Package className="w-3.5 h-3.5 text-amber-500" />
+                      <span>{t('nav.harvestPool')}</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setCurrentTab('activity-logs');
+                        setAdminMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-amber-500/10 flex items-center gap-2 text-slate-700 dark:text-slate-200"
+                    >
+                      <Activity className="w-3.5 h-3.5 text-teal-500" />
+                      <span>Audit Trail (CSV Export)</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setCurrentTab('ledger-explorer');
+                        setAdminMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-amber-500/10 flex items-center gap-2 text-slate-700 dark:text-slate-200"
+                    >
+                      <FileCheck2 className="w-3.5 h-3.5 text-emerald-500" />
+                      <span>{t('nav.ledgerExplorer')}</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setCurrentTab('admin-settings');
+                        setAdminMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-amber-500/10 flex items-center gap-2 text-slate-700 dark:text-slate-200"
+                    >
+                      <Settings className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Platform Settings</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </>
           )}
         </nav>

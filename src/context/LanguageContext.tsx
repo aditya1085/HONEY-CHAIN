@@ -20,6 +20,11 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.approvalQueue': 'Approvals',
     'nav.activityLogs': 'Audit Trail',
     'nav.idGenerators': 'ID Engine',
+    'nav.analytics': 'Analytics & AI',
+    'nav.moderation': 'Moderation & Disputes',
+    'nav.users': 'User Management',
+    'nav.dataManager': 'Data Manager',
+    'nav.settings': 'Platform Settings',
     'nav.myHives': 'My Hives',
     'nav.listings': 'My Listings',
     'nav.orders': 'Orders',
@@ -97,6 +102,33 @@ const translations: Record<Language, Record<string, string>> = {
     'pending.title': 'Your Beekeeper Registration is Under Review',
     'pending.desc': 'Our admin team is currently cross-verifying your Madhukranti ID and Aadhaar details. Once approved, your unique Beekeeper ID (e.g. B045) will be generated and you can start adding hives.',
 
+    // Marketplace & Verification
+    'market.verifiedOnly': '100% Verified Pure & Lab Certified',
+    'market.addToCart': 'Add to Cart',
+    'market.verifyProvenance': 'Inspect Provenance',
+    'market.scanJarQr': 'Scan Jar QR Code',
+    'market.directPayout': '88% Goes Directly to Apiculturist',
+
+    // Bee Assistant (Madhubot)
+    'bot.title': 'Madhubot AI Assistant',
+    'bot.subtitle': 'Bilingual Beekeeping & Purity Expert',
+    'bot.placeholder': 'Ask in English or हिंदी (e.g. FSSAI standards, Varroa treatment)...',
+    'bot.welcome': 'Namaste! I am Madhubot (मधुमित्र). How can I help you with beekeeping, lab purity standards, or honey verification today?',
+
+    // Analytics & AI
+    'analytics.title': 'National Honey Intelligence & Analytics',
+    'analytics.subtitle': 'Server-cached multi-dimensional aggregation across 5 states',
+    'analytics.aiInsights': 'Gemini 3.8 Flash Supply Chain Insights',
+    'analytics.recompute': 'Recompute Stats Document',
+
+    // Data Manager
+    'data.managerTitle': 'Master Data Manager & Simulator',
+    'data.managerSubtitle': 'CRUD operations, CSV batch importer, sample data generator & IoT simulator',
+    'data.generateSample': 'Generate Sample Data Wizard',
+    'data.deleteSample': 'Delete All Sample Data',
+    'data.factoryReset': 'Confirmed Factory Reset',
+    'data.sensorSimulator': 'IoT Brood Telemetry Simulator',
+
     // General
     'lang.en': 'English',
     'lang.hi': 'हिंदी',
@@ -114,6 +146,11 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.approvalQueue': 'सत्यापन कतार',
     'nav.activityLogs': 'ऑडिट लॉग्स',
     'nav.idGenerators': 'आईडी इंजन',
+    'nav.analytics': 'एनालिटिक्स एवं एआई',
+    'nav.moderation': 'मॉडरेशन व विवाद',
+    'nav.users': 'उपयोगकर्ता प्रबंधन',
+    'nav.dataManager': 'डेटा प्रबंधक (Data Manager)',
+    'nav.settings': 'प्लेटफ़ॉर्म सेटिंग्स',
     'nav.myHives': 'मेरे छत्ते (Hives)',
     'nav.listings': 'मेरी लिस्टिंग',
     'nav.orders': 'ऑर्डर ट्रैकिंग',
@@ -190,6 +227,33 @@ const translations: Record<Language, Record<string, string>> = {
     // Pending Banner
     'pending.title': 'आपका पंजीकरण वर्तमान में समीक्षाधीन है',
     'pending.desc': 'हमारी टीम मधुक्रांति आईडी और आधार विवरण की जांच कर रही है। स्वीकृति मिलते ही आपकी विशिष्ट आईडी (जैसे B045) आवंटित होगी।',
+
+    // Marketplace & Verification (Hindi)
+    'market.verifiedOnly': '१००% लैब प्रमाणित व शुद्ध शहद',
+    'market.addToCart': 'कार्ट में जोड़ें',
+    'market.verifyProvenance': 'प्रमाणिकता जांचें',
+    'market.scanJarQr': 'जार का क्यूआर कोड स्कैन करें',
+    'market.directPayout': '८८% आय सीधे पालक के बैंक खाते में',
+
+    // Bee Assistant (Madhubot Hindi)
+    'bot.title': 'मधुमित्र एआई सहायक (Madhubot)',
+    'bot.subtitle': 'द्विभाषी मधुमक्खी पालन एवं शुद्धता विशेषज्ञ',
+    'bot.placeholder': 'हिंदी या अंग्रेज़ी में प्रश्न पूछें (जैसे वररोआ माइट्स का उपचार, FSSAI मानक)...',
+    'bot.welcome': 'नमस्ते! मैं मधुमित्र (Madhubot) हूँ। आज मैं मधुमक्खी पालन, एफएसएसएआई शुद्धता मानकों या लेज़र सत्यापन में आपकी क्या सहायता कर सकता हूँ?',
+
+    // Analytics & AI (Hindi)
+    'analytics.title': 'राष्ट्रीय शहद बुद्धिमत्ता एवं एनालिटिक्स',
+    'analytics.subtitle': '५ राज्यों में सर्वर-कैश्ड बहुआयामी एकत्रीकरण',
+    'analytics.aiInsights': 'जेमिनी ३.८ फ़्लैश आपूर्ति श्रृंखला विश्लेषण',
+    'analytics.recompute': 'आंकड़े पुनः गणना करें',
+
+    // Data Manager (Hindi)
+    'data.managerTitle': 'मास्टर डेटा प्रबंधक एवं सिमुलेटर',
+    'data.managerSubtitle': 'CRUD संचालन, सीएसवी बैच आयातक, नमूना डेटा जनरेटर एवं आईओटी सिमुलेटर',
+    'data.generateSample': 'नमूना डेटा विज़ार्ड चलाएं',
+    'data.deleteSample': 'सभी नमूना डेटा हटाएं',
+    'data.factoryReset': 'पुष्टीकृत फ़ैक्टरी रीसेट (RESET)',
+    'data.sensorSimulator': 'आईओटी ब्रूड टेलीमेट्री सिमुलेटर',
 
     // General
     'lang.en': 'English',

@@ -31,6 +31,12 @@ import { CartDrawerModal } from './components/cart/CartDrawerModal';
 import { BeekeeperListingsManager } from './components/beekeeper/BeekeeperListingsManager';
 import { OrderTrackingView } from './components/orders/OrderTrackingView';
 import { PayoutAndTrustLedger } from './components/admin/PayoutAndTrustLedger';
+import { AdminAnalyticsView } from './components/admin/AdminAnalyticsView';
+import { MarketplaceModeration } from './components/admin/MarketplaceModeration';
+import { UserManagementView } from './components/admin/UserManagementView';
+import { PlatformSettingsView } from './components/admin/PlatformSettingsView';
+import { AdminDataManager } from './components/admin/AdminDataManager';
+import { BeeAssistantWidget } from './components/common/BeeAssistantWidget';
 import { seedPhase3Data } from './services/seedPhase3';
 import { seedPhase4Data } from './services/seedPhase4';
 import { CameraCapture, CapturedPhoto } from './components/camera/CameraCapture';
@@ -371,6 +377,16 @@ const MainContent: React.FC = () => {
 
         {currentTab === 'admin-queue' && <AdminApprovalQueue />}
 
+        {currentTab === 'admin-analytics' && <AdminAnalyticsView />}
+
+        {currentTab === 'admin-moderation' && <MarketplaceModeration />}
+
+        {currentTab === 'admin-users' && <UserManagementView />}
+
+        {currentTab === 'admin-settings' && <PlatformSettingsView />}
+
+        {currentTab === 'admin-data' && <AdminDataManager />}
+
         {currentTab === 'activity-logs' && <ActivityLogViewer />}
 
         {currentTab === 'id-engine' && <IdGeneratorsTest />}
@@ -443,6 +459,9 @@ const MainContent: React.FC = () => {
         onClose={() => setIsQRScannerOpen(false)}
         onScanSuccess={handleScanSuccess}
       />
+
+      {/* Phase 5 Bilingual AI Bee Assistant Chatbot (Madhubot) */}
+      <BeeAssistantWidget />
     </div>
   );
 };

@@ -13,11 +13,14 @@ export type HiveStatus = 'active' | 'inactive' | 'decommissioned';
 
 export interface UserProfile {
   id: string;
+  uid?: string;
   email: string;
   displayName: string;
   role: UserRole;
   beekeeperId?: string;
   labId?: string;
+  aadhaarLast4?: string;
+  trustScore?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -443,6 +446,7 @@ export interface OrderRecord {
     method: 'RAZORPAY_TEST' | 'COD_TEST' | 'MOCK_ONLINE';
     paidAt: string;
     verified: boolean;
+    isSimulated?: boolean;
   };
   tracking?: {
     courierName?: string;
@@ -598,6 +602,7 @@ export interface DisputeRecord {
   customerName: string;
   customerEmail: string;
   amount: number;
+  claimAmount?: number;
   reason: 'Damaged Seal' | 'Suspected Adulteration' | 'Delayed Delivery' | 'Package Mismatch' | 'Other';
   description: string;
   status: 'OPEN' | 'UNDER_REVIEW' | 'REFUNDED' | 'REJECTED' | 'RESOLVED';

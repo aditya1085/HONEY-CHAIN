@@ -570,7 +570,7 @@ export const AdminAnalyticsView: React.FC = () => {
                   outerRadius={85}
                   paddingAngle={4}
                   dataKey="value"
-                  label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                  label={({ name, percent }) => `${name} (${(((percent ?? 0) as number) * 100).toFixed(0)}%)`}
                 >
                   {floralPieData.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
