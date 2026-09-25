@@ -103,6 +103,7 @@ export interface SensorReading {
   humidity: number;
   weight?: number;
   battery?: number;
+  deviceId?: string;
   timestamp: string;
   isAnomaly?: boolean;
   isSample?: boolean;
@@ -231,6 +232,7 @@ export type BatchStatus =
 export interface BatchRecord {
   id: string;
   batchId: string; // HB-2609-UP-0012
+  batchSeq?: number;
   state: string;
   district?: string;
   beekeeperIds: string[];
