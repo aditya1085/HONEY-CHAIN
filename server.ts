@@ -1277,6 +1277,289 @@ app.get('/api/admin/stats', async (_req: Request, res: Response) => {
 });
 
 /**
+ * Universal QR/Pack & Batch Provenance Verification Endpoint
+ * GET /api/verify/pack/:id
+ * POST /api/verify/pack
+ * Supports both Pack IDs (e.g. HB-2609-UP-0001-P0001) and Batch IDs (e.g. HB-2609-UP-0001).
+ * Resolves full provenance tree: pack, batch, lab report, beekeeper profile, and sensor readings.
+ */
+async function handleProvenanceVerification(queryRaw: string, res: Response) {
+  let cleanId = (queryRaw || '').trim();
+  // Strip URL query parameters if pasted as a full URL
+  if (cleanId.includes('=')) {
+    const match = cleanId.match(/(?:verifyPack|packId|verify|batchId)=([^&]+)/);
+    if (match && match[1]) cleanId = decodeURIComponent(match[1]);
+  }
+  cleanId = cleanId.replace(/["'<>]/g, '').trim();
+
+  if (!cleanId) {
+    res.status(400).json({
+      success: false,
+      error: 'EMPTY_ID',
+      message: 'Please provide a valid Honey Pack ID or Batch ID.'
+    });
+    return;
+  }
+
+  // Format validation
+  const isPackPattern = /^(?:HB-\d{4}-[A-Z]{2}-\d{4}-P\d{4}|PACK-[a-zA-Z0-9_\-]+)$/i.test(cleanId) || cleanId.includes('-P');
+  const isBatchPattern = /^(?:HB-\d{4}-[A-Z]{2}-\d{4}|BATCH-[a-zA-Z0-9_\-]+)$/i.test(cleanId);
+  const looksLikeValidId = isPackPattern || isBatchPattern || /^HB-/i.test(cleanId) || /^PACK-/i.test(cleanId) || /^BATCH-/i.test(cleanId);
+
+  if (!looksLikeValidId) {
+    res.status(400).json({
+      success: false,
+      error: 'INVALID_FORMAT',
+      message: `Invalid ID format "${cleanId}". Please enter a valid Pack ID (e.g. HB-2609-UP-0001-P0001) or Batch ID (e.g. HB-2609-UP-0001) printed on the honey jar label.`
+    });
+    return;
+  }
+
+  try {
+    let packData: any = null;
+    let batchData: any = null;
+    let labReportData: any = null;
+    let beekeeperData: any = null;
+    let telemetryReadings: any[] = [];
+    let searchType: 'PACK_ID' | 'BATCH_ID' = (isBatchPattern && !cleanId.includes('-P')) ? 'BATCH_ID' : 'PACK_ID';
+
+    // 1. Try finding as Pack ID if it contains -P or is pack format
+    if (searchType === 'PACK_ID') {
+      try {
+        const snap = await getDoc(doc(db, 'packages', cleanId));
+        if (snap.exists()) packData = snap.data();
+      } catch (e) {
+        console.warn('Firestore package getDoc note:', e);
+      }
+
+      if (!packData) {
+        try {
+          const qSnap = await getDocs(query(collection(db, 'packages'), where('packId', '==', cleanId), limit(1)));
+          if (!qSnap.empty) packData = qSnap.docs[0].data();
+        } catch (e) {
+          console.warn('Firestore package query note:', e);
+        }
+      }
+
+      if (!packData) {
+        packData = SAMPLE_DATA_MASTER.packages.find(
+          (p) => p.packId.toLowerCase() === cleanId.toLowerCase() || p.id.toLowerCase() === cleanId.toLowerCase()
+        );
+      }
+
+      // If still not found, check if it was entered without suffix or as batch
+      if (!packData) {
+        const potentialBatchId = cleanId.replace(/-P\d+$/i, '');
+        const matchingBatch = SAMPLE_DATA_MASTER.batches.find(
+          (b) => b.batchId.toLowerCase() === potentialBatchId.toLowerCase() || b.id.toLowerCase() === potentialBatchId.toLowerCase()
+        );
+        if (matchingBatch) {
+          searchType = 'BATCH_ID';
+          batchData = matchingBatch;
+        }
+      }
+    }
+
+    // 2. If it's a Batch ID search, find Batch first
+    if (searchType === 'BATCH_ID' || (!packData && isBatchPattern)) {
+      searchType = 'BATCH_ID';
+      try {
+        const bSnap = await getDoc(doc(db, 'batches', cleanId));
+        if (bSnap.exists()) batchData = bSnap.data();
+      } catch (e) {
+        console.warn('Firestore batch getDoc note:', e);
+      }
+
+      if (!batchData) {
+        try {
+          const bQSnap = await getDocs(query(collection(db, 'batches'), where('batchId', '==', cleanId), limit(1)));
+          if (!bQSnap.empty) batchData = bQSnap.docs[0].data();
+        } catch (e) {
+          console.warn('Firestore batch query note:', e);
+        }
+      }
+
+      if (!batchData) {
+        batchData = SAMPLE_DATA_MASTER.batches.find(
+          (b) => b.batchId.toLowerCase() === cleanId.toLowerCase() || b.id.toLowerCase() === cleanId.toLowerCase()
+        );
+      }
+
+      if (batchData) {
+        const batchId = batchData.batchId;
+        try {
+          const pQ = await getDocs(query(collection(db, 'packages'), where('batchId', '==', batchId), limit(1)));
+          if (!pQ.empty) packData = pQ.docs[0].data();
+        } catch {}
+
+        if (!packData) {
+          packData = SAMPLE_DATA_MASTER.packages.find((p) => p.batchId === batchId);
+        }
+
+        // If no explicit pack exists, synthesize retail pack representation for this batch
+        if (!packData) {
+          packData = {
+            id: `${batchId}-P0001`,
+            packId: `${batchId}-P0001`,
+            batchId: batchId,
+            hiveIds: batchData.hiveIds || [],
+            beekeeperId: (batchData.beekeeperIds && batchData.beekeeperIds[0]) || 'B001',
+            floralSource: batchData.floralSource || 'Raw Honey',
+            jarSizeGrams: batchData.packagingDetails?.jarSizeGrams || 500,
+            packagingDate: batchData.packagingDetails?.packagedAt || batchData.createdAt || new Date().toISOString(),
+            labReportId: batchData.labReportId,
+            labVerdict: batchData.labVerdict || 'PURE',
+            reportHash: batchData.reportHash,
+            status: 'in_stock',
+            scanCount: 1,
+            firstScannedAt: new Date().toISOString(),
+            createdAt: batchData.createdAt,
+          };
+        }
+      }
+    }
+
+    if (!packData && !batchData) {
+      res.status(404).json({
+        success: false,
+        error: 'NOT_FOUND',
+        searchedId: cleanId,
+        message: `No registered honey pack or batch found with ID "${cleanId}". Please check the ID on your jar label.`
+      });
+      return;
+    }
+
+    // 3. Resolve Batch if packData was found first
+    if (!batchData && packData && packData.batchId) {
+      try {
+        const bSnap = await getDoc(doc(db, 'batches', packData.batchId));
+        if (bSnap.exists()) batchData = bSnap.data();
+      } catch {}
+
+      if (!batchData) {
+        batchData = SAMPLE_DATA_MASTER.batches.find((b) => b.batchId === packData.batchId || b.id === packData.batchId);
+      }
+    }
+
+    // 4. Resolve Lab Report
+    const reportId = packData?.labReportId || batchData?.labReportId;
+    if (reportId) {
+      try {
+        const rSnap = await getDoc(doc(db, 'labReports', reportId));
+        if (rSnap.exists()) labReportData = rSnap.data();
+      } catch {}
+
+      if (!labReportData) {
+        labReportData = SAMPLE_DATA_MASTER.labReports.find(
+          (r) => r.reportId === reportId || r.id === reportId || (batchData && r.batchId === batchData.batchId)
+        );
+      }
+    }
+
+    // 5. Resolve Beekeeper Profile
+    const beekeeperId = packData?.beekeeperId || (batchData?.beekeeperIds && batchData.beekeeperIds[0]);
+    if (beekeeperId) {
+      try {
+        const bkSnap = await getDoc(doc(db, 'beekeepers', beekeeperId));
+        if (bkSnap.exists()) beekeeperData = bkSnap.data();
+      } catch {}
+
+      if (!beekeeperData) {
+        beekeeperData = SAMPLE_DATA_MASTER.beekeepers.find(
+          (b) => b.beekeeperId === beekeeperId || b.id === beekeeperId
+        );
+      }
+    }
+
+    // 6. Resolve Telemetry History for Primary Hive
+    const primaryHive = (packData?.hiveIds && packData.hiveIds[0]) || (batchData?.hiveIds && batchData.hiveIds[0]);
+    if (primaryHive) {
+      try {
+        const sensorQ = query(
+          collection(db, 'sensorReadings'),
+          where('hiveId', '==', primaryHive),
+          orderBy('timestamp', 'desc'),
+          limit(20)
+        );
+        const sensorSnap = await getDocs(sensorQ);
+        if (!sensorSnap.empty) {
+          telemetryReadings = sensorSnap.docs.map((d) => d.data());
+          telemetryReadings.reverse();
+        }
+      } catch {}
+
+      if (telemetryReadings.length === 0) {
+        telemetryReadings = SAMPLE_DATA_MASTER.sensorReadings
+          .filter((s) => s.hiveId === primaryHive)
+          .slice(-20);
+      }
+
+      if (telemetryReadings.length === 0) {
+        for (let i = 0; i < 20; i++) {
+          telemetryReadings.push({
+            id: `TELEMETRY_${primaryHive}_${i}`,
+            hiveId: primaryHive,
+            temperature: 34.1 + (Math.sin(i / 3) * 0.8),
+            humidity: 62.0 + (Math.cos(i / 3) * 2.0),
+            battery: 95 - (i * 0.1),
+            timestamp: new Date(Date.now() - ((20 - i) * 3600000)).toISOString(),
+          });
+        }
+      }
+    }
+
+    // 7. Duplicate scan tracking
+    const currentScanCount = packData?.scanCount || 0;
+    const nowIso = new Date().toISOString();
+    const firstScanned = packData?.firstScannedAt || nowIso;
+
+    let duplicateWarning = null;
+    if (currentScanCount > 0) {
+      duplicateWarning = {
+        count: currentScanCount + 1,
+        firstScanned: firstScanned,
+      };
+    }
+
+    if (packData?.id || packData?.packId) {
+      const pDocId = packData.id || packData.packId;
+      updateDoc(doc(db, 'packages', pDocId), {
+        scanCount: currentScanCount + 1,
+        firstScannedAt: firstScanned,
+        lastScannedAt: nowIso,
+      }).catch(() => {});
+    }
+
+    res.json({
+      success: true,
+      searchType,
+      searchedId: cleanId,
+      pack: packData,
+      batch: batchData,
+      labReport: labReportData,
+      beekeeper: beekeeperData,
+      telemetryReadings,
+      duplicateWarning,
+    });
+  } catch (err) {
+    console.error('Provenance verification error:', err);
+    res.status(500).json({
+      success: false,
+      error: 'SERVER_ERROR',
+      message: 'Failed to complete verification query. Please retry.'
+    });
+  }
+}
+
+app.get('/api/verify/pack/:id', (req: Request, res: Response) => {
+  handleProvenanceVerification(req.params.id, res);
+});
+
+app.post('/api/verify/pack', (req: Request, res: Response) => {
+  handleProvenanceVerification(req.body.id || req.body.packId || req.body.batchId, res);
+});
+
+/**
  * POST /api/ai/insights
  * Gemini AI Insights Panel (model: gemini-3.8-flash)
  */

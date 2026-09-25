@@ -15,6 +15,7 @@ import { HoneyPack, BatchRecord, LabReport, BeekeeperProfile, SensorReading } fr
 import { sha256, canonicalJson } from '../../services/blockchainService';
 import { generateLabReportPdf } from '../../services/pdfService';
 import { useLanguage } from '../../context/LanguageContext';
+import { SAMPLE_DATA_MASTER } from '../../services/sampleDataMaster';
 import {
   ShieldCheck,
   Award,
@@ -35,6 +36,9 @@ import {
   TrendingUp,
   FileCheck,
   Search,
+  Package,
+  Sparkles,
+  Info,
 } from 'lucide-react';
 import {
   ResponsiveContainer,

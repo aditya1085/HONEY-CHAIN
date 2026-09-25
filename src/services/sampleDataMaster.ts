@@ -789,6 +789,162 @@ export function generateMasterDataset(): MasterSampleDataset {
     }
   }
 
+  // Ensure the flagship verified Pack ID 'HB-2609-UP-0001-P0001' and Batch ID 'HB-2609-UP-0001' are in the master dataset
+  const bkpB001: BeekeeperProfile = {
+    id: 'B001',
+    beekeeperId: 'B001',
+    userId: 'usr_b001_verma',
+    name: 'Rajesh Kumar Verma',
+    email: 'rajesh.verma@honeychain.in',
+    phone: '+91 94150 12890',
+    state: 'Uttar Pradesh',
+    district: 'Varanasi',
+    address: 'Varanasi Rural Apiary, Ganga Basin, UP',
+    lat: 25.3176,
+    lng: 82.9739,
+    aadhaarLast4: '8841',
+    aadhaarHash: 'hash_aadhaar_b001',
+    madhukrantiId: 'MK-UP-2024-8841',
+    status: 'approved',
+    trustScore: 96,
+    yearsOfExperience: 12,
+    totalHivesCount: 45,
+    isSample: true,
+    createdAt: '2026-09-01T08:00:00.000Z',
+    updatedAt: '2026-09-22T08:00:00.000Z',
+  };
+  if (!dataset.beekeepers.some(b => b.beekeeperId === 'B001' || b.id === 'B001')) {
+    dataset.beekeepers.unshift(bkpB001);
+  }
+
+  const hiveH01: HiveRecord = {
+    id: 'HC-UP-B001-H01',
+    hiveId: 'HC-UP-B001-H01',
+    beekeeperId: 'B001',
+    hiveType: 'Langstroth',
+    colonyType: 'Apis mellifera',
+    area: 'Varanasi Organic Mustard Belt',
+    landType: 'Farmland',
+    lat: 25.3176,
+    lng: 82.9739,
+    address: 'Plot 12, Ganga Khadar, Varanasi, UP',
+    setupDate: '2024-11-15',
+    registrationDate: '2024-11-20',
+    expectedProduction: 40,
+    status: 'active',
+    approvalStatus: 'approved',
+    iotDeviceId: 'DEV-HC-UP-001',
+    isSample: true,
+    createdAt: '2026-09-01T08:00:00.000Z',
+    updatedAt: '2026-09-22T08:00:00.000Z',
+  };
+  if (!dataset.hives.some(h => h.hiveId === 'HC-UP-B001-H01' || h.id === 'HC-UP-B001-H01')) {
+    dataset.hives.unshift(hiveH01);
+  }
+
+  const labReport0001: LabReport = {
+    id: 'LBR-2609-0001',
+    reportId: 'LBR-2609-0001',
+    batchId: 'HB-2609-UP-0001',
+    sampleId: 'SMP-2609-0001',
+    labId: 'LAB_CBRTI_PUNE',
+    labName: 'Central Bee Research & Training Institute (CBRTI) National Lab',
+    accreditationNo: 'NABL-TC-0841 • FSSAI-REF-01',
+    analystName: 'Dr. Ramesh K. Sharma',
+    testDate: '2026-09-21T11:00:00.000Z',
+    parameters: {
+      moisture: 17.4,
+      fructose: 38.6,
+      glucose: 31.8,
+      sucrose: 1.8,
+      hmf: 14.2,
+      c4Sugars: 'Negative (Delta 13C < -23.5‰)',
+      fgRatio: 1.21,
+      specificGravity: 1.42,
+      ashContent: 0.12,
+      acidity: 18.5,
+      diastaseActivity: 16.4,
+      antibioticResidues: 'Not Detected (ND)',
+      heavyMetals: 'Compliant (Lead < 0.1 ppm)',
+    },
+    verdict: 'PURE',
+    remarks: 'Passed all 18 FSSAI Gazette parameters. Negative for C4/C3 exogenous corn and rice syrups. High brassica pollen density confirms genuine unpasteurized mustard honey.',
+    reportHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    isSample: true,
+    createdAt: '2026-09-21T11:30:00.000Z',
+  };
+  if (!dataset.labReports.some(r => r.reportId === 'LBR-2609-0001' || r.id === 'LBR-2609-0001')) {
+    dataset.labReports.unshift(labReport0001);
+  }
+
+  const batchUP0001: BatchRecord = {
+    id: 'HB-2609-UP-0001',
+    batchId: 'HB-2609-UP-0001',
+    batchSeq: 1,
+    beekeeperIds: ['B001'],
+    hiveIds: ['HC-UP-B001-H01', 'HC-UP-B001-H02'],
+    harvestIds: ['HVST_SEED_01', 'HVST_SEED_02'],
+    state: 'Uttar Pradesh',
+    district: 'Varanasi',
+    floralSource: 'Mustard',
+    totalQuantityKg: 60.5,
+    avgMoisture: 17.4,
+    status: 'packaged',
+    labVerdict: 'PURE',
+    labReportId: 'LBR-2609-0001',
+    reportHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    packagingDetails: {
+      jarSizeGrams: 500,
+      packCount: 120,
+      packagedAt: '2026-09-22T08:30:00.000Z',
+      packIds: ['HB-2609-UP-0001-P0001'],
+    },
+    isSample: true,
+    createdAt: '2026-09-20T10:00:00.000Z',
+    updatedAt: '2026-09-22T08:30:00.000Z',
+  };
+  if (!dataset.batches.some(b => b.batchId === 'HB-2609-UP-0001' || b.id === 'HB-2609-UP-0001')) {
+    dataset.batches.unshift(batchUP0001);
+  }
+
+  const packUP0001: HoneyPack = {
+    id: 'HB-2609-UP-0001-P0001',
+    packId: 'HB-2609-UP-0001-P0001',
+    batchId: 'HB-2609-UP-0001',
+    hiveIds: ['HC-UP-B001-H01', 'HC-UP-B001-H02'],
+    beekeeperId: 'B001',
+    floralSource: 'Mustard',
+    jarSizeGrams: 500,
+    packagingDate: '2026-09-22T08:30:00.000Z',
+    labReportId: 'LBR-2609-0001',
+    labVerdict: 'PURE',
+    reportHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    status: 'in_stock',
+    scanCount: 3,
+    firstScannedAt: '2026-09-23T14:10:00.000Z',
+    lastScannedAt: new Date().toISOString(),
+    isSample: true,
+    createdAt: '2026-09-22T08:30:00.000Z',
+  };
+  if (!dataset.packages.some(p => p.packId === 'HB-2609-UP-0001-P0001' || p.id === 'HB-2609-UP-0001-P0001')) {
+    dataset.packages.unshift(packUP0001);
+  }
+
+  // Telemetry readings for HC-UP-B001-H01
+  for (let i = 0; i < 20; i++) {
+    const readingTime = new Date(Date.now() - ((20 - i) * 3600000)).toISOString();
+    dataset.sensorReadings.push({
+      id: `READ_UP_H01_${i}`,
+      hiveId: 'HC-UP-B001-H01',
+      deviceId: 'DEV-HC-UP-001',
+      temperature: 34.2 + (Math.sin(i / 3) * 0.9),
+      humidity: 61.5 + (Math.cos(i / 3) * 2.2),
+      battery: 92 - (i * 0.2),
+      isSample: true,
+      timestamp: readingTime,
+    });
+  }
+
   return dataset;
 }
 
