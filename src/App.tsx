@@ -49,7 +49,7 @@ import { HiveRecord, CartItem, HoneyListing } from './types';
 
 const MainContent: React.FC = () => {
   const { currentUser, beekeeperProfile, activeRole } = useAuth();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
 
   const [currentTab, setCurrentTab] = useState<string>('marketplace');
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
@@ -93,6 +93,85 @@ const MainContent: React.FC = () => {
       setCurrentTab('verify-honey');
     }
   }, []);
+
+  // Auto-route to assigned role dashboard on fresh login or role sync
+  const lastRoutedKeyRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (currentUser?.uid) {
+      const routingKey = `${currentUser.uid}_${activeRole}`;
+      if (routingKey !== lastRoutedKeyRef.current) {
+        lastRoutedKeyRef.current = routingKey;
+        if (activeRole === 'ADMIN') {
+          setCurrentTab('admin-analytics');
+        } else if (activeRole === 'BEEKEEPER') {
+          setCurrentTab('beekeeper-dashboard');
+        } else if (activeRole === 'LAB') {
+          setCurrentTab('lab-portal');
+        } else {
+          setCurrentTab('marketplace');
+        }
+      }
+    } else {
+      lastRoutedKeyRef.current = null;
+    }
+  }, [currentUser, activeRole]);
+
+  // Role Access Checks & Restrictions
+  const ADMIN_ONLY_TABS = [
+    'admin-queue',
+    'admin-analytics',
+    'admin-moderation',
+    'admin-users',
+    'admin-settings',
+    'admin-data',
+    'admin-hives',
+    'species-thresholds',
+    'harvest-pool',
+    'activity-logs',
+    'id-engine',
+    'payouts',
+  ];
+
+  const BEEKEEPER_ONLY_TABS = [
+    'beekeeper-dashboard',
+    'beekeeper-register',
+    'my-hives',
+    'harvests',
+    'my-listings',
+  ];
+
+  const LAB_ONLY_TABS = [
+    'lab-portal',
+  ];
+
+  const isAccessDenied = React.useMemo(() => {
+    if (!currentUser) {
+      return (
+        ADMIN_ONLY_TABS.includes(currentTab) ||
+        BEEKEEPER_ONLY_TABS.includes(currentTab) ||
+        LAB_ONLY_TABS.includes(currentTab)
+      );
+    }
+    if (ADMIN_ONLY_TABS.includes(currentTab) && activeRole !== 'ADMIN') {
+      return true;
+    }
+    if (BEEKEEPER_ONLY_TABS.includes(currentTab) && activeRole !== 'BEEKEEPER' && activeRole !== 'ADMIN') {
+      return true;
+    }
+    if (LAB_ONLY_TABS.includes(currentTab) && activeRole !== 'LAB' && activeRole !== 'ADMIN') {
+      return true;
+    }
+    return false;
+  }, [currentUser, currentTab, activeRole]);
+
+  // Redirect to marketplace/home when user signs out or is unauthenticated
+  React.useEffect(() => {
+    if (!currentUser) {
+      if (ADMIN_ONLY_TABS.includes(currentTab) || BEEKEEPER_ONLY_TABS.includes(currentTab) || LAB_ONLY_TABS.includes(currentTab)) {
+        setCurrentTab('marketplace');
+      }
+    }
+  }, [currentUser, currentTab]);
 
   // Cart operations
   const handleAddToCart = (item: CartItem) => {
@@ -172,7 +251,7 @@ const MainContent: React.FC = () => {
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <div className="min-h-screen flex flex-col bg-amber-50/40 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
+    <div key={language} className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
       {/* Header */}
       <Header
         onOpenAuth={() => setIsAuthModalOpen(true)}
@@ -186,6 +265,35 @@ const MainContent: React.FC = () => {
 
       {/* Main View Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 lg:pb-10">
+        {isAccessDenied ? (
+          <div className="max-w-xl mx-auto my-16 p-8 bg-red-50 dark:bg-red-950/30 border border-red-300 dark:border-red-800 rounded-3xl text-center space-y-4 shadow-xl animate-in fade-in">
+            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 rounded-2xl flex items-center justify-center mx-auto">
+              <ShieldAlert className="w-8 h-8" />
+            </div>
+            <h2 className="text-xl font-bold text-red-900 dark:text-red-200">
+              {t('access denied — role restricted')}
+            </h2>
+            <p className="text-xs text-red-700 dark:text-red-300 leading-relaxed">
+              {currentUser
+                ? `Your account (${currentUser.email}) is authenticated as a verified ${activeRole}. You do not have permissions to access this screen.`
+                : 'Authentication is required to access this dashboard. Please sign in with an authorized role account.'}
+            </p>
+            <div className="pt-2 flex justify-center gap-3">
+              <button
+                onClick={() => {
+                  if (activeRole === 'ADMIN') setCurrentTab('admin-analytics');
+                  else if (activeRole === 'BEEKEEPER') setCurrentTab('beekeeper-dashboard');
+                  else if (activeRole === 'LAB') setCurrentTab('lab-portal');
+                  else setCurrentTab('marketplace');
+                }}
+                className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow transition"
+              >
+                {t('return to authorized dashboard')}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
         {/* Scanned QR Code Result Notice */}
         {scanResult && (
           <div className="mb-6 p-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-between gap-3 animate-in fade-in">
@@ -390,6 +498,8 @@ const MainContent: React.FC = () => {
         {currentTab === 'activity-logs' && <ActivityLogViewer />}
 
         {currentTab === 'id-engine' && <IdGeneratorsTest />}
+          </>
+        )}
       </main>
 
       {/* Footer */}

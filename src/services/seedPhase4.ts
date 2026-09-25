@@ -58,7 +58,7 @@ export async function seedPhase4Data(): Promise<void> {
       title: 'Wild Acacia Forest Raw Honey (Ayodhya Apiary)',
       description: 'Delicate light amber honey gathered by indigenous Apis cerana indica colonies foraging on wild acacia blossoms. Mild sweetness, zero processing.',
       floralSource: 'Acacia',
-      state: 'UP',
+      state: 'Uttar Pradesh',
       jarSizeGrams: 500,
       priceInr: 580,
       mrpInr: 680,
@@ -72,8 +72,100 @@ export async function seedPhase4Data(): Promise<void> {
       updatedAt: '2026-09-23T11:00:00.000Z',
     };
 
+    const sampleListing3: HoneyListing = {
+      id: 'LIST_HB_2609_PB_0001',
+      batchId: 'HB-2609-PB-0001',
+      beekeeperId: 'B003',
+      beekeeperName: 'Sardar Gurpreet Singh',
+      title: 'Pure Golden Mustard Honey (Dasuya Orchards)',
+      description: 'Cold extracted raw creamed mustard blossom honey from Punjab fertile mustard belt. Unpasteurized and rich in natural bee pollen.',
+      floralSource: 'Mustard',
+      state: 'Punjab',
+      jarSizeGrams: 500,
+      priceInr: 480,
+      mrpInr: 600,
+      stockCount: 35,
+      initialStock: 40,
+      rawUnfiltered: true,
+      status: 'active',
+      labVerdict: 'PURE',
+      trustScore: 97,
+      createdAt: '2026-09-23T14:00:00.000Z',
+      updatedAt: '2026-09-23T14:00:00.000Z',
+    };
+
+    const sampleListing4: HoneyListing = {
+      id: 'LIST_HB_2609_WB_0001',
+      batchId: 'HB-2609-WB-0001',
+      beekeeperId: 'B004',
+      beekeeperName: 'Debabrata Mondal',
+      title: 'Sundarban Raw Wild Multiflora Honey',
+      description: 'Single-origin wild mangrove honey harvested by Mowals in the mangrove delta buffer zone. Deep amber with complex floral taste.',
+      floralSource: 'Multiflora',
+      state: 'West Bengal',
+      jarSizeGrams: 500,
+      priceInr: 620,
+      mrpInr: 750,
+      stockCount: 19,
+      initialStock: 25,
+      rawUnfiltered: true,
+      status: 'active',
+      labVerdict: 'PURE',
+      trustScore: 95,
+      createdAt: '2026-09-23T15:00:00.000Z',
+      updatedAt: '2026-09-23T15:00:00.000Z',
+    };
+
+    const sampleListing5: HoneyListing = {
+      id: 'LIST_HB_2609_MH_0001',
+      batchId: 'HB-2609-MH-0001',
+      beekeeperId: 'B005',
+      beekeeperName: 'Aniket Patil',
+      title: 'Western Ghats Wild Forest Jamun Honey',
+      description: 'Distinctive dark, low glycemic raw honey gathered during peak Syzygium cumini (Jamun) flowering across the Sahyadri mountains.',
+      floralSource: 'Jamun',
+      state: 'Maharashtra',
+      jarSizeGrams: 500,
+      priceInr: 690,
+      mrpInr: 850,
+      stockCount: 26,
+      initialStock: 30,
+      rawUnfiltered: true,
+      status: 'active',
+      labVerdict: 'PURE',
+      trustScore: 96,
+      createdAt: '2026-09-23T16:00:00.000Z',
+      updatedAt: '2026-09-23T16:00:00.000Z',
+    };
+
+    const sampleListing6: HoneyListing = {
+      id: 'LIST_HB_2609_JK_0001',
+      batchId: 'HB-2609-JK-0001',
+      beekeeperId: 'B006',
+      beekeeperName: 'Farooq Ahmad Mir',
+      title: 'Kashmir White Acacia Raw Comb Honey',
+      description: 'Exquisite water-white raw acacia honey collected by indigenous mountain bees in Tral valley. Mild, fragrant floral nectar.',
+      floralSource: 'Kashmir White Acacia',
+      state: 'Jammu & Kashmir',
+      jarSizeGrams: 500,
+      priceInr: 890,
+      mrpInr: 1100,
+      stockCount: 15,
+      initialStock: 20,
+      rawUnfiltered: true,
+      status: 'active',
+      labVerdict: 'PURE',
+      trustScore: 99,
+      createdAt: '2026-09-23T17:00:00.000Z',
+      updatedAt: '2026-09-23T17:00:00.000Z',
+    };
+
     await setDoc(doc(db, 'listings', sampleListing1.id), sampleListing1, { merge: true });
     await setDoc(doc(db, 'listings', sampleListing2.id), sampleListing2, { merge: true });
+    await setDoc(doc(db, 'listings', sampleListing3.id), sampleListing3, { merge: true });
+    await setDoc(doc(db, 'listings', sampleListing4.id), sampleListing4, { merge: true });
+    await setDoc(doc(db, 'listings', sampleListing5.id), sampleListing5, { merge: true });
+    await setDoc(doc(db, 'listings', sampleListing6.id), sampleListing6, { merge: true });
 
     // 3. Seed Sample Review
     const reviewId = 'REV_SAMPLE_01';

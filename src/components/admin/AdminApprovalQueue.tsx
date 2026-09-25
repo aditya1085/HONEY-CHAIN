@@ -8,13 +8,14 @@ import { generateBeekeeperId } from '../../services/idGenerators';
 import { logActivity } from '../../services/activityLogger';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { SAMPLE_DATA_MASTER } from '../../services/sampleDataMaster';
 
 export const AdminApprovalQueue: React.FC = () => {
   const { currentUser } = useAuth();
   const { t } = useLanguage();
 
-  const [beekeepers, setBeekeepers] = useState<BeekeeperProfile[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [beekeepers, setBeekeepers] = useState<BeekeeperProfile[]>(SAMPLE_DATA_MASTER.beekeepers);
+  const [loading, setLoading] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -31,7 +32,6 @@ export const AdminApprovalQueue: React.FC = () => {
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
-    setLoading(true);
     const unsubscribe = onSnapshot(
       collection(db, 'beekeepers'),
       (snapshot) => {
@@ -39,17 +39,19 @@ export const AdminApprovalQueue: React.FC = () => {
         snapshot.forEach((d) => {
           list.push(d.data() as BeekeeperProfile);
         });
-        // Sort: pending first, then by date desc
-        list.sort((a, b) => {
-          if (a.status === 'pending' && b.status !== 'pending') return -1;
-          if (b.status === 'pending' && a.status !== 'pending') return 1;
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        });
-        setBeekeepers(list);
+        if (list.length > 0) {
+          // Sort: pending first, then by date desc
+          list.sort((a, b) => {
+            if (a.status === 'pending' && b.status !== 'pending') return -1;
+            if (b.status === 'pending' && a.status !== 'pending') return 1;
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          });
+          setBeekeepers(list);
+        }
         setLoading(false);
       },
       (err) => {
-        handleFirestoreError(err, OperationType.GET, 'beekeepers');
+        console.warn('AdminApprovalQueue notice (using master dataset):', err);
         setLoading(false);
       }
     );
@@ -281,7 +283,7 @@ export const AdminApprovalQueue: React.FC = () => {
                     <td className="px-4 py-3.5 text-slate-600 dark:text-slate-400">
                       <div>{bk.district}, {bk.state}</div>
                       <div className="text-[10px] font-mono text-slate-400">
-                        {bk.lat.toFixed(4)}, {bk.lng.toFixed(4)}
+                        {bk.lat != null && bk.lng != null ? `${Number(bk.lat).toFixed(4)}, ${Number(bk.lng).toFixed(4)}` : 'Coordinates N/A'}
                       </div>
                     </td>
                     <td className="px-4 py-3.5 font-mono text-slate-700 dark:text-slate-300">

@@ -4,6 +4,8 @@ import { db } from '../../firebase/config';
 import { HarvestRecord, HiveRecord } from '../../types';
 import { Droplets, Plus, Search, Filter, Calendar, Scale, CheckCircle2, Clock, Layers } from 'lucide-react';
 import { HarvestEntryModal } from './HarvestEntryModal';
+import { useLanguage } from '../../context/LanguageContext';
+import { SAMPLE_DATA_MASTER } from '../../services/sampleDataMaster';
 
 interface HarvestListViewProps {
   beekeeperId: string;
@@ -20,8 +22,12 @@ export const HarvestListView: React.FC<HarvestListViewProps> = ({
   hives,
   onSelectBatch,
 }) => {
-  const [harvests, setHarvests] = useState<HarvestRecord[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const { t } = useLanguage();
+  const [harvests, setHarvests] = useState<HarvestRecord[]>(() => {
+    const initial = SAMPLE_DATA_MASTER.harvests.filter((h) => h.beekeeperId === beekeeperId);
+    return initial.length > 0 ? initial : SAMPLE_DATA_MASTER.harvests.slice(0, 10);
+  });
+  const [loading, setLoading] = useState<boolean>(false);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'unbatched' | 'batched'>('ALL');
@@ -39,17 +45,20 @@ export const HarvestListView: React.FC<HarvestListViewProps> = ({
       q,
       (snapshot) => {
         const list = snapshot.docs.map((doc) => doc.data() as HarvestRecord);
-        setHarvests(list);
+        if (list.length > 0) {
+          setHarvests(list);
+        }
         setLoading(false);
       },
       (err) => {
-        console.warn('Harvests listener fallback:', err);
-        // Fallback without orderBy in case index building
+        console.warn('Harvests listener fallback (using master dataset):', err);
         const fallbackQ = query(collection(db, 'harvests'), where('beekeeperId', '==', beekeeperId));
         onSnapshot(fallbackQ, (snap) => {
           const list = snap.docs.map((d) => d.data() as HarvestRecord);
-          list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-          setHarvests(list);
+          if (list.length > 0) {
+            list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            setHarvests(list);
+          }
           setLoading(false);
         });
       }
@@ -100,7 +109,7 @@ export const HarvestListView: React.FC<HarvestListViewProps> = ({
         <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
           <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Total Harvested</div>
           <div className="mt-1 text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-            {totalKg.toFixed(1)} <span className="text-sm font-normal text-zinc-500">kg</span>
+            {(totalKg ?? 0).toFixed(1)} <span className="text-sm font-normal text-zinc-500">kg</span>
           </div>
           <div className="mt-1 text-xs text-zinc-400">{harvests.length} total extractions logged</div>
         </div>
@@ -110,7 +119,7 @@ export const HarvestListView: React.FC<HarvestListViewProps> = ({
             Unbatched Honey Pool
           </div>
           <div className="mt-1 text-2xl font-bold text-amber-600 dark:text-amber-400">
-            {unbatchedKg.toFixed(1)} <span className="text-sm font-normal">kg</span>
+            {(unbatchedKg ?? 0).toFixed(1)} <span className="text-sm font-normal">kg</span>
           </div>
           <div className="mt-1 text-xs text-amber-700/80 dark:text-amber-400/70">
             Ready for admin batching & lab purity testing
@@ -120,7 +129,7 @@ export const HarvestListView: React.FC<HarvestListViewProps> = ({
         <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
           <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Batched & Traceable</div>
           <div className="mt-1 text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-            {(totalKg - unbatchedKg).toFixed(1)} <span className="text-sm font-normal text-zinc-500">kg</span>
+            {((totalKg ?? 0) - (unbatchedKg ?? 0)).toFixed(1)} <span className="text-sm font-normal text-zinc-500">kg</span>
           </div>
           <div className="mt-1 text-xs text-zinc-400">Aggregated into verifiable batch lots</div>
         </div>

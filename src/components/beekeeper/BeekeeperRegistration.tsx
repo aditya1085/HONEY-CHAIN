@@ -58,8 +58,12 @@ export const BeekeeperRegistration: React.FC<BeekeeperRegistrationProps> = ({ on
     setDetectingGps(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setLat(Number(pos.coords.latitude.toFixed(6)));
-        setLng(Number(pos.coords.longitude.toFixed(6)));
+        if (pos?.coords?.latitude != null && !isNaN(pos.coords.latitude)) {
+          setLat(Number(pos.coords.latitude.toFixed(6)));
+        }
+        if (pos?.coords?.longitude != null && !isNaN(pos.coords.longitude)) {
+          setLng(Number(pos.coords.longitude.toFixed(6)));
+        }
         setDetectingGps(false);
       },
       (err) => {

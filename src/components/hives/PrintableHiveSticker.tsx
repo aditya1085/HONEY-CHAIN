@@ -108,7 +108,7 @@ export const PrintableHiveSticker: React.FC<PrintableHiveStickerProps> = ({ hive
             {/* GPS coordinates & Disclaimer */}
             <div className="text-[9px] text-slate-500 w-full pt-1 border-t border-slate-200 flex justify-between items-center">
               <span className="font-mono">
-                {hive.lat.toFixed(4)}°N, {hive.lng.toFixed(4)}°E
+                {hive.lat != null && hive.lng != null ? `${Number(hive.lat).toFixed(4)}°N, ${Number(hive.lng).toFixed(4)}°E` : 'GPS Coordinates N/A'}
               </span>
               <span className="font-semibold text-amber-700 print:text-black flex items-center gap-1">
                 <ShieldCheck className="w-3 h-3" /> NBB Madhukranti Verified

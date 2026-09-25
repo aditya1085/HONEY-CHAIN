@@ -14,6 +14,7 @@ import { db } from '../../firebase/config';
 import { HoneyPack, BatchRecord, LabReport, BeekeeperProfile, SensorReading } from '../../types';
 import { sha256, canonicalJson } from '../../services/blockchainService';
 import { generateLabReportPdf } from '../../services/pdfService';
+import { useLanguage } from '../../context/LanguageContext';
 import {
   ShieldCheck,
   Award,
@@ -60,6 +61,7 @@ export const QRVerifyPage: React.FC<QRVerifyPageProps> = ({
   onNavigateMarketplace,
   onNavigateHome,
 }) => {
+  const { t } = useLanguage();
   const effectivePackId = initialPackId || packIdParam || '';
   const [packIdInput, setPackIdInput] = useState<string>(effectivePackId);
   const [activePackId, setActivePackId] = useState<string>(effectivePackId);
@@ -245,13 +247,13 @@ export const QRVerifyPage: React.FC<QRVerifyPageProps> = ({
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold backdrop-blur-md">
               <ShieldCheck className="h-4 w-4" />
-              <span>Cryptographic Proof of Provenance</span>
+              <span>{t('verify.blockchainAnchored')}</span>
             </div>
             <h1 className="mt-2 text-2xl sm:text-3xl font-black tracking-tight">
-              Honey Chain Public QR Verification
+              {t('verify.title')}
             </h1>
             <p className="mt-1 text-xs sm:text-sm text-amber-100 max-w-xl">
-              Inspect origin apiary, live IoT hive health, certified NABL/FSSAI laboratory tests, and immutable blockchain hashes for your jar.
+              {t('verify.subtitle')}
             </p>
           </div>
 
@@ -261,13 +263,13 @@ export const QRVerifyPage: React.FC<QRVerifyPageProps> = ({
               value={packIdInput}
               onChange={(e) => setPackIdInput(e.target.value)}
               placeholder="e.g. HB-2609-UP-0001-P0001"
-              className="rounded-xl bg-white/90 px-3.5 py-2 text-xs font-mono font-semibold text-zinc-900 placeholder:text-zinc-500 focus:bg-white focus:outline-hidden"
+              className="rounded-xl bg-white/90 px-3.5 py-2 text-xs font-mono font-semibold text-slate-900 placeholder:text-slate-500 focus:bg-white focus:outline-hidden"
             />
             <button
               type="submit"
-              className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-bold text-white hover:bg-zinc-800 transition"
+              className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 transition"
             >
-              Verify
+              {t('action.verify')}
             </button>
           </form>
         </div>

@@ -71,6 +71,7 @@ export interface HiveRecord {
   status: HiveStatus;
   approvalStatus?: 'pending' | 'approved' | 'rejected';
   iotDeviceId?: string;
+  notes?: string;
   isSample?: boolean;
   createdAt: string;
   updatedAt: string;
@@ -399,10 +400,14 @@ export interface CartItem {
 
 export type OrderStatus =
   | 'placed'
+  | 'paid'
   | 'confirmed'
+  | 'packed'
   | 'dispatched'
+  | 'shipped'
   | 'delivered'
-  | 'cancelled';
+  | 'cancelled'
+  | 'refunded';
 
 export interface OrderItem {
   listingId: string;
@@ -412,7 +417,8 @@ export interface OrderItem {
   jarSizeGrams: number;
   priceInr: number;
   quantity: number;
-  beekeeperId: string;
+  maxStock?: number;
+  beekeeperId?: string;
   beekeeperName: string;
   assignedPackIds?: string[];
 }
@@ -430,15 +436,24 @@ export interface ShippingAddress {
 export interface OrderRecord {
   id: string;
   orderId: string; // ORD-2609-0012
-  userId: string;
-  userEmail: string;
+  userId?: string;
+  userEmail?: string;
+  customerId?: string;
+  customerName?: string;
+  customerEmail?: string;
   items: OrderItem[];
-  subtotalInr: number;
-  taxInr: number;
+  subtotalInr?: number;
+  taxInr?: number;
   shippingInr: number;
   totalInr: number;
+  totalAmountInr?: number;
   status: OrderStatus;
   shippingAddress: ShippingAddress;
+  paymentMethod?: string;
+  paymentId?: string;
+  courierName?: string;
+  trackingNumber?: string;
+  isSample?: boolean;
   paymentDetails: {
     razorpayOrderId?: string;
     razorpayPaymentId?: string;
@@ -480,19 +495,23 @@ export interface ReviewRecord {
   orderId: string;
   batchId: string;
   listingId: string;
-  userId: string;
-  userName: string;
+  userId?: string;
+  userName?: string;
+  customerId?: string;
+  customerName?: string;
   beekeeperId: string;
   rating: number; // 1 to 5
   comment: string;
-  verifiedPurchase: boolean;
+  verifiedPurchase?: boolean;
+  isVerifiedBuyer?: boolean;
+  isSample?: boolean;
   beekeeperReply?: {
     replyText: string;
     repliedAt: string;
     beekeeperName: string;
   };
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export interface TrustScoreWeights {

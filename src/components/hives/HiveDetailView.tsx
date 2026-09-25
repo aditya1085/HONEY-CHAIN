@@ -312,7 +312,7 @@ export const HiveDetailView: React.FC<HiveDetailViewProps> = ({ hive, onBack }) 
           <div className="flex items-center gap-3 text-xs text-slate-500">
             <span className="flex items-center gap-1 font-mono">
               <MapPin className="w-3.5 h-3.5 text-amber-500" />
-              {hive.lat.toFixed(4)}, {hive.lng.toFixed(4)}
+              {hive.lat != null && hive.lng != null ? `${Number(hive.lat).toFixed(4)}, ${Number(hive.lng).toFixed(4)}` : 'Coordinates N/A'}
             </span>
             <span>•</span>
             <span className="flex items-center gap-1">
@@ -331,7 +331,7 @@ export const HiveDetailView: React.FC<HiveDetailViewProps> = ({ hive, onBack }) 
               <Thermometer className="w-4 h-4 text-amber-500" />
             </div>
             <div className="text-2xl font-mono font-bold text-slate-900 dark:text-white">
-              {latestReading ? `${latestReading.temperature.toFixed(1)}°C` : '--'}
+              {latestReading && latestReading.temperature != null ? `${Number(latestReading.temperature).toFixed(1)}°C` : '--'}
             </div>
             <div className="text-[10px] text-slate-400 mt-0.5">
               Safe: {threshold?.tempMin}°C - {threshold?.tempMax}°C
@@ -345,7 +345,7 @@ export const HiveDetailView: React.FC<HiveDetailViewProps> = ({ hive, onBack }) 
               <Droplets className="w-4 h-4 text-blue-500" />
             </div>
             <div className="text-2xl font-mono font-bold text-slate-900 dark:text-white">
-              {latestReading ? `${latestReading.humidity.toFixed(0)}%` : '--'}
+              {latestReading && latestReading.humidity != null ? `${Number(latestReading.humidity).toFixed(0)}%` : '--'}
             </div>
             <div className="text-[10px] text-slate-400 mt-0.5">
               Safe: {threshold?.humidityMin}% - {threshold?.humidityMax}%
@@ -359,7 +359,7 @@ export const HiveDetailView: React.FC<HiveDetailViewProps> = ({ hive, onBack }) 
               <Scale className="w-4 h-4 text-emerald-500" />
             </div>
             <div className="text-2xl font-mono font-bold text-slate-900 dark:text-white">
-              {latestReading && latestReading.weight ? `${latestReading.weight.toFixed(1)} kg` : '24.2 kg'}
+              {latestReading && latestReading.weight != null ? `${Number(latestReading.weight).toFixed(1)} kg` : '24.2 kg'}
             </div>
             <div className="text-[10px] text-slate-400 mt-0.5">Honey accumulation</div>
           </div>
@@ -692,12 +692,12 @@ export const HiveDetailView: React.FC<HiveDetailViewProps> = ({ hive, onBack }) 
                       {new Date(r.timestamp).toLocaleString()}
                     </td>
                     <td className="px-4 py-2.5 font-bold text-amber-600 dark:text-amber-400">
-                      {r.temperature.toFixed(1)}°C
+                      {r.temperature != null ? `${Number(r.temperature).toFixed(1)}°C` : '--'}
                     </td>
                     <td className="px-4 py-2.5 text-blue-600 dark:text-blue-400 font-bold">
-                      {r.humidity.toFixed(0)}%
+                      {r.humidity != null ? `${Number(r.humidity).toFixed(0)}%` : '--'}
                     </td>
-                    <td className="px-4 py-2.5">{r.weight ? `${r.weight.toFixed(1)} kg` : '--'}</td>
+                    <td className="px-4 py-2.5">{r.weight != null ? `${Number(r.weight).toFixed(1)} kg` : '--'}</td>
                     <td className="px-4 py-2.5">{r.battery ? `${r.battery}%` : '--'}</td>
                     <td className="px-4 py-2.5">
                       {r.isAnomaly ? (

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, ShieldCheck, Camera, QrCode, Store, Package, TrendingUp } from 'lucide-react';
+import { ShieldCheck, Camera, QrCode, Store, Package, TrendingUp, FlaskConical } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 
@@ -28,10 +28,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         }`}
       >
         <Store className="w-5 h-5" />
-        <span className="text-[10px]">Shop</span>
+        <span className="text-[10px]">{t('nav.marketplace')}</span>
       </button>
 
-      {/* Beekeeper Hub or Admin Hub */}
+      {/* Role-specific Hub: Admin, Lab, Beekeeper, or Consumer */}
       {activeRole === 'ADMIN' ? (
         <button
           onClick={() => setCurrentTab('admin-analytics')}
@@ -42,7 +42,19 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           }`}
         >
           <TrendingUp className="w-5 h-5" />
-          <span className="text-[10px]">Admin</span>
+          <span className="text-[10px]">{t('role.admin')}</span>
+        </button>
+      ) : activeRole === 'LAB' ? (
+        <button
+          onClick={() => setCurrentTab('lab-portal')}
+          className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition ${
+            currentTab === 'lab-portal'
+              ? 'text-teal-600 dark:text-teal-400 font-bold'
+              : 'text-slate-500 dark:text-slate-400'
+          }`}
+        >
+          <FlaskConical className="w-5 h-5" />
+          <span className="text-[10px]">{t('nav.labPortal')}</span>
         </button>
       ) : (
         <button
@@ -54,7 +66,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           }`}
         >
           <ShieldCheck className="w-5 h-5" />
-          <span className="text-[10px]">{beekeeperProfile ? 'Hives' : 'Register'}</span>
+          <span className="text-[10px]">{beekeeperProfile ? t('nav.myHives') : t('nav.registerBeekeeper')}</span>
         </button>
       )}
 
@@ -73,7 +85,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         className="flex flex-col items-center gap-1 p-1.5 rounded-xl text-slate-500 dark:text-slate-400 transition hover:text-amber-600"
       >
         <QrCode className="w-5 h-5" />
-        <span className="text-[10px]">Verify</span>
+        <span className="text-[10px]">{t('nav.verify')}</span>
       </button>
 
       {/* Orders */}
@@ -84,7 +96,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         }`}
       >
         <Package className="w-5 h-5" />
-        <span className="text-[10px]">Orders</span>
+        <span className="text-[10px]">{t('nav.orders')}</span>
       </button>
     </nav>
   );

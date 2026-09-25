@@ -4,6 +4,7 @@ import { db } from '../../firebase/config';
 import { CartItem, ShippingAddress, OrderRecord, PayoutRecord } from '../../types';
 import { generateOrderInvoicePdf } from '../../services/invoiceService';
 import { logActivity } from '../../services/activityLogger';
+import { useLanguage } from '../../context/LanguageContext';
 import {
   X,
   ShoppingBag,
@@ -42,6 +43,7 @@ export const CartDrawerModal: React.FC<CartDrawerModalProps> = ({
   onOrderCompleted,
   onOrderPlaced,
 }) => {
+  const { t } = useLanguage();
   const [step, setStep] = useState<'cart' | 'address' | 'payment' | 'confirmed'>('cart');
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
     fullName: currentUser?.displayName || 'Aditya Tripathi',
@@ -261,22 +263,22 @@ export const CartDrawerModal: React.FC<CartDrawerModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/60 backdrop-blur-xs">
       <div className="relative h-full w-full max-w-md bg-white shadow-2xl dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 flex flex-col justify-between">
         {/* Top Header */}
-        <div className="flex items-center justify-between border-b p-5 dark:border-zinc-800">
+        <div className="flex items-center justify-between border-b p-5 border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2">
             <ShoppingBag className="h-5 w-5 text-amber-500" />
-            <h2 className="font-bold text-base text-zinc-900 dark:text-zinc-100">
+            <h2 className="font-bold text-base text-slate-900 dark:text-slate-100">
               {step === 'cart'
-                ? `Cart (${cartItems.length} items)`
+                ? `${t('cart.title')} (${cartItems.length})`
                 : step === 'address'
-                ? 'Delivery Address'
+                ? t('Delivery Address')
                 : step === 'payment'
-                ? 'Secure Checkout'
-                : 'Order Confirmed!'}
+                ? t('cart.checkout')
+                : t('Order Confirmed!')}
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             <X className="h-5 w-5" />
           </button>
@@ -296,12 +298,12 @@ export const CartDrawerModal: React.FC<CartDrawerModalProps> = ({
             <>
               {cartItems.length === 0 ? (
                 <div className="py-16 text-center space-y-3">
-                  <ShoppingBag className="mx-auto h-12 w-12 text-zinc-300" />
-                  <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                    Your cart is empty
+                  <ShoppingBag className="mx-auto h-12 w-12 text-slate-300" />
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    {t('cart.empty')}
                   </p>
-                  <p className="text-xs text-zinc-400">
-                    Explore the marketplace to add certified pure honey jars.
+                  <p className="text-xs text-slate-400">
+                    {t('cart.emptyDesc')}
                   </p>
                 </div>
               ) : (
@@ -637,25 +639,25 @@ export const CartDrawerModal: React.FC<CartDrawerModalProps> = ({
 
         {/* Bottom Total & Step Controller */}
         {step !== 'confirmed' && (
-          <div className="border-t border-zinc-100 p-5 dark:border-zinc-800 space-y-3 bg-white dark:bg-zinc-900">
+          <div className="border-t border-slate-200 p-5 dark:border-slate-800 space-y-3 bg-white dark:bg-slate-900">
             {/* Price Breakdown */}
-            <div className="space-y-1 text-xs text-zinc-500">
+            <div className="space-y-1 text-xs text-slate-500 dark:text-slate-400">
               <div className="flex justify-between">
-                <span>Subtotal:</span>
-                <span className="font-semibold text-zinc-800 dark:text-zinc-200">₹{subtotal}</span>
+                <span>{t('cart.subtotal')}:</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">₹{subtotal}</span>
               </div>
               <div className="flex justify-between">
                 <span>GST (5% Pure Honey):</span>
-                <span className="font-semibold text-zinc-800 dark:text-zinc-200">₹{taxInr}</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">₹{taxInr}</span>
               </div>
               <div className="flex justify-between">
-                <span>Shipping:</span>
+                <span>{t('cart.shipping')}:</span>
                 <span className="font-semibold text-emerald-600">
-                  {shippingInr > 0 ? `₹${shippingInr}` : 'FREE (Order > ₹999)'}
+                  {shippingInr > 0 ? `₹${shippingInr}` : t('cart.free')}
                 </span>
               </div>
-              <div className="flex justify-between pt-1 border-t text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                <span>Total Amount:</span>
+              <div className="flex justify-between pt-1 border-t border-slate-200 dark:border-slate-800 text-sm font-bold text-slate-900 dark:text-slate-100">
+                <span>{t('cart.total')}:</span>
                 <span className="text-amber-600 font-mono">₹{totalInr}</span>
               </div>
             </div>
@@ -665,9 +667,9 @@ export const CartDrawerModal: React.FC<CartDrawerModalProps> = ({
               <button
                 onClick={handleProceedToAddress}
                 disabled={cartItems.length === 0}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-500 py-3 text-xs font-bold text-white shadow-md shadow-amber-500/20 hover:bg-amber-600 disabled:opacity-50 transition"
+                className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-500 py-3 text-xs font-bold text-slate-950 shadow-md shadow-amber-500/20 hover:bg-amber-400 disabled:opacity-50 transition"
               >
-                <span>Proceed to Shipping Address</span>
+                <span>{t('cart.checkout')}</span>
                 <ArrowRight className="h-4 w-4" />
               </button>
             )}
@@ -677,16 +679,16 @@ export const CartDrawerModal: React.FC<CartDrawerModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setStep('cart')}
-                  className="rounded-xl border border-zinc-300 py-2.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
+                  className="rounded-xl border border-slate-300 dark:border-slate-700 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
-                  Back to Cart
+                  {t('action.back')}
                 </button>
                 <button
                   type="button"
                   onClick={handleProceedToPayment}
-                  className="inline-flex items-center justify-center gap-1 rounded-xl bg-amber-500 py-2.5 text-xs font-bold text-white shadow-md shadow-amber-500/20 hover:bg-amber-600 transition"
+                  className="inline-flex items-center justify-center gap-1 rounded-xl bg-amber-500 py-2.5 text-xs font-bold text-slate-950 shadow-md shadow-amber-500/20 hover:bg-amber-400 transition"
                 >
-                  <span>Select Payment</span>
+                  <span>{t('action.next')}</span>
                   <ArrowRight className="h-4 w-4" />
                 </button>
               </div>
@@ -698,15 +700,15 @@ export const CartDrawerModal: React.FC<CartDrawerModalProps> = ({
                   type="button"
                   onClick={() => setStep('address')}
                   disabled={processing}
-                  className="rounded-xl border border-zinc-300 py-2.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
+                  className="rounded-xl border border-slate-300 dark:border-slate-700 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
-                  Back to Address
+                  {t('action.back')}
                 </button>
                 <button
                   type="button"
                   onClick={handleExecutePayment}
                   disabled={processing}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-amber-500 py-2.5 text-xs font-bold text-white shadow-md shadow-amber-500/20 hover:bg-amber-600 disabled:opacity-50 transition"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-amber-500 py-2.5 text-xs font-bold text-slate-950 shadow-md shadow-amber-500/20 hover:bg-amber-400 disabled:opacity-50 transition"
                 >
                   <Lock className="h-3.5 w-3.5" />
                   <span>
@@ -725,12 +727,12 @@ export const CartDrawerModal: React.FC<CartDrawerModalProps> = ({
         )}
 
         {step === 'confirmed' && (
-          <div className="border-t border-zinc-100 p-5 dark:border-zinc-800">
+          <div className="border-t border-slate-200 p-5 dark:border-slate-800">
             <button
               onClick={onClose}
-              className="w-full rounded-2xl bg-zinc-900 py-3 text-xs font-bold text-white hover:bg-zinc-800 transition dark:bg-zinc-100 dark:text-zinc-900"
+              className="w-full rounded-2xl bg-slate-900 py-3 text-xs font-bold text-white hover:bg-slate-800 transition dark:bg-slate-100 dark:text-slate-900"
             >
-              Continue Shopping
+              {t('cart.startShopping')}
             </button>
           </div>
         )}

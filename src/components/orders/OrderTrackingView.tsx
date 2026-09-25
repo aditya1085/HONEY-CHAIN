@@ -14,6 +14,8 @@ import { db } from '../../firebase/config';
 import { OrderRecord, OrderStatus, ReviewRecord } from '../../types';
 import { generateOrderInvoicePdf } from '../../services/invoiceService';
 import { logActivity } from '../../services/activityLogger';
+import { useLanguage } from '../../context/LanguageContext';
+import { SAMPLE_DATA_MASTER } from '../../services/sampleDataMaster';
 import {
   Package,
   Truck,
@@ -44,9 +46,10 @@ export const OrderTrackingView: React.FC<OrderTrackingViewProps> = ({
   onVerifyBatch,
   onVerifyPack,
 }) => {
-  const [orders, setOrders] = useState<OrderRecord[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [selectedOrder, setSelectedOrder] = useState<OrderRecord | null>(null);
+  const { t } = useLanguage();
+  const [orders, setOrders] = useState<OrderRecord[]>(SAMPLE_DATA_MASTER.orders);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [selectedOrder, setSelectedOrder] = useState<OrderRecord | null>(SAMPLE_DATA_MASTER.orders[0] || null);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
   // Dispatch Update Form
@@ -252,12 +255,12 @@ export const OrderTrackingView: React.FC<OrderTrackingViewProps> = ({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <Truck className="h-6 w-6 text-amber-500" />
-            Orders & Traceability Tracking
+            {t('orders.title')}
           </h2>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            Real-time fulfillment state machine with verified consignment tracking and official invoices
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {t('orders.subtitle')}
           </p>
         </div>
 
@@ -268,26 +271,26 @@ export const OrderTrackingView: React.FC<OrderTrackingViewProps> = ({
               onClick={() => setStatusFilter(s)}
               className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
                 statusFilter === s
-                  ? 'bg-amber-500 text-white'
-                  : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300'
+                  ? 'bg-amber-500 text-slate-950 font-bold'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
               }`}
             >
-              {s === 'ALL' ? 'All Orders' : s.charAt(0).toUpperCase() + s.slice(1)}
+              {s === 'ALL' ? t('market.allStates').replace('States', 'Orders') : t(`status.${s}`)}
             </button>
           ))}
         </div>
       </div>
 
       {loading ? (
-        <div className="p-16 text-center text-sm text-zinc-400">Loading orders...</div>
+        <div className="p-16 text-center text-sm text-slate-400">{t('loading...')}</div>
       ) : filteredOrders.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-zinc-300 p-12 text-center dark:border-zinc-800">
-          <Package className="mx-auto h-12 w-12 text-zinc-300" />
-          <h3 className="mt-2 text-base font-bold text-zinc-800 dark:text-zinc-200">
-            No orders found
+        <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-12 text-center dark:border-slate-800 dark:bg-slate-900">
+          <Package className="mx-auto h-12 w-12 text-slate-300" />
+          <h3 className="mt-2 text-base font-bold text-slate-800 dark:text-slate-200">
+            {t('orders.noOrders')}
           </h3>
-          <p className="text-xs text-zinc-500 mt-1">
-            Orders placed in the marketplace will appear here for live consignment tracking.
+          <p className="text-xs text-slate-500 mt-1">
+            {t('orders.noOrdersDesc')}
           </p>
         </div>
       ) : (

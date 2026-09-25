@@ -48,11 +48,10 @@ export const Header: React.FC<HeaderProps> = ({
   currentTab,
   setCurrentTab,
 }) => {
-  const { currentUser, userProfile, activeRole, setActiveRole, signOut, bootstrapAdmin } = useAuth();
+  const { currentUser, userProfile, activeRole, signOut } = useAuth();
   const { language, setLanguage, t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
 
-  const [roleMenuOpen, setRoleMenuOpen] = useState(false);
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
 
   const roles: Array<{ role: UserRole; label: string }> = [
@@ -61,15 +60,6 @@ export const Header: React.FC<HeaderProps> = ({
     { role: 'ADMIN', label: t('role.admin') },
     { role: 'LAB', label: t('role.lab') },
   ];
-
-  const handleRoleSelect = (role: UserRole) => {
-    setActiveRole(role);
-    setRoleMenuOpen(false);
-    if (role === 'ADMIN') setCurrentTab('admin-queue');
-    else if (role === 'BEEKEEPER') setCurrentTab('beekeeper-dashboard');
-    else if (role === 'LAB') setCurrentTab('lab-portal');
-    else setCurrentTab('marketplace');
-  };
 
   return (
     <header className="sticky top-0 z-40 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-amber-500/20 shadow-xs transition-colors">
@@ -87,9 +77,6 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="flex items-center gap-1.5">
               <span className="text-lg font-black tracking-tight text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 transition">
                 {t('brand.title')}
-              </span>
-              <span className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30">
-                Phase 4
               </span>
             </div>
             <p className="text-[10px] text-slate-500 dark:text-slate-400 hidden sm:block truncate max-w-[210px]">
@@ -110,7 +97,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <Store className="w-3.5 h-3.5 text-amber-500" />
-            <span>Marketplace</span>
+            <span>{t('nav.marketplace')}</span>
           </button>
 
           {/* QR Verify Public Tool */}
@@ -123,7 +110,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <FileCheck2 className="w-3.5 h-3.5 text-emerald-500" />
-            <span>Verify Honey</span>
+            <span>{t('nav.verify')}</span>
           </button>
 
           {/* Beekeeper Links */}
@@ -159,7 +146,7 @@ export const Header: React.FC<HeaderProps> = ({
                     : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                Listings
+                {t('nav.listings')}
               </button>
             </>
           )}
@@ -188,7 +175,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <Package className="w-3.5 h-3.5 text-blue-500" />
-            <span>Orders</span>
+            <span>{t('nav.orders')}</span>
           </button>
 
           {/* Lab Portal Link */}
@@ -229,7 +216,7 @@ export const Header: React.FC<HeaderProps> = ({
                 }`}
               >
                 <Database className="w-3.5 h-3.5 text-blue-500" />
-                <span>Data Manager</span>
+                <span>{t('nav.dataManager')}</span>
               </button>
 
               {/* Admin Console Dropdown for All Phase 1-5 Modules */}
@@ -253,14 +240,14 @@ export const Header: React.FC<HeaderProps> = ({
                       : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
-                  <span>Admin Console</span>
+                  <span>{t('nav.adminConsole')}</span>
                   <ChevronDown className="w-3 h-3" />
                 </button>
 
                 {adminMenuOpen && (
                   <div className="absolute left-0 mt-2 w-56 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 py-2 z-50 text-xs animate-in fade-in space-y-0.5">
                     <div className="px-3 py-1 text-[10px] uppercase font-bold text-slate-400">
-                      Operations & Control:
+                      {t('nav.operations')}:
                     </div>
                     <button
                       onClick={() => {
@@ -280,7 +267,7 @@ export const Header: React.FC<HeaderProps> = ({
                       className="w-full text-left px-3 py-1.5 hover:bg-amber-500/10 flex items-center gap-2 text-slate-700 dark:text-slate-200"
                     >
                       <ShieldAlert className="w-3.5 h-3.5 text-red-500" />
-                      <span>Moderation & Disputes</span>
+                      <span>{t('nav.moderation')}</span>
                     </button>
                     <button
                       onClick={() => {
@@ -290,7 +277,7 @@ export const Header: React.FC<HeaderProps> = ({
                       className="w-full text-left px-3 py-1.5 hover:bg-amber-500/10 flex items-center gap-2 text-slate-700 dark:text-slate-200"
                     >
                       <Users className="w-3.5 h-3.5 text-blue-500" />
-                      <span>User Management</span>
+                      <span>{t('nav.users')}</span>
                     </button>
                     <button
                       onClick={() => {
@@ -300,7 +287,7 @@ export const Header: React.FC<HeaderProps> = ({
                       className="w-full text-left px-3 py-1.5 hover:bg-amber-500/10 flex items-center gap-2 text-slate-700 dark:text-slate-200"
                     >
                       <Store className="w-3.5 h-3.5 text-purple-500" />
-                      <span>Payouts & Trust Score</span>
+                      <span>{t('nav.payouts')}</span>
                     </button>
                     <button
                       onClick={() => {
@@ -320,7 +307,7 @@ export const Header: React.FC<HeaderProps> = ({
                       className="w-full text-left px-3 py-1.5 hover:bg-amber-500/10 flex items-center gap-2 text-slate-700 dark:text-slate-200"
                     >
                       <Activity className="w-3.5 h-3.5 text-teal-500" />
-                      <span>Audit Trail (CSV Export)</span>
+                      <span>{t('nav.activityLogs')}</span>
                     </button>
                     <button
                       onClick={() => {
@@ -340,7 +327,7 @@ export const Header: React.FC<HeaderProps> = ({
                       className="w-full text-left px-3 py-1.5 hover:bg-amber-500/10 flex items-center gap-2 text-slate-700 dark:text-slate-200"
                     >
                       <Settings className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Platform Settings</span>
+                      <span>{t('nav.settings')}</span>
                     </button>
                   </div>
                 )}
@@ -419,51 +406,13 @@ export const Header: React.FC<HeaderProps> = ({
             {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4 text-amber-400" />}
           </button>
 
-          {/* Active Role Selector / Demo Switcher */}
-          <div className="relative">
-            <button
-              onClick={() => setRoleMenuOpen(!roleMenuOpen)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs font-bold hover:bg-amber-500/20 transition"
-              title="Active Role View"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-              <span>{activeRole}</span>
-              <ChevronDown className="w-3 h-3 text-amber-600 dark:text-amber-400" />
-            </button>
-
-            {roleMenuOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 py-1.5 z-50 text-xs animate-in fade-in">
-                <div className="px-3 py-1 text-[10px] uppercase font-bold text-slate-400">
-                  Switch Role Persona:
-                </div>
-                {roles.map((r) => (
-                  <button
-                    key={r.role}
-                    onClick={() => handleRoleSelect(r.role)}
-                    className={`w-full text-left px-3 py-2 flex items-center justify-between hover:bg-amber-500/10 transition ${
-                      activeRole === r.role ? 'text-amber-600 font-bold dark:text-amber-400' : 'text-slate-700 dark:text-slate-300'
-                    }`}
-                  >
-                    <span>{r.label}</span>
-                    <span className="text-[10px] font-mono text-slate-400">{r.role}</span>
-                  </button>
-                ))}
-
-                {currentUser && userProfile?.role !== 'ADMIN' && (
-                  <div className="pt-1 mt-1 border-t border-slate-100 dark:border-slate-800 px-2">
-                    <button
-                      onClick={() => {
-                        bootstrapAdmin();
-                        setRoleMenuOpen(false);
-                      }}
-                      className="w-full py-1.5 px-2 bg-amber-500 text-slate-950 font-bold rounded-lg text-[11px] flex items-center justify-center gap-1 shadow-sm"
-                    >
-                      <Sparkles className="w-3 h-3" /> Bootstrap Super Admin
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+          {/* Verified Immutable Role Badge (Server-Enforced, Non-Switchable) */}
+          <div
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs font-bold select-none shadow-xs"
+            title={`Authenticated as ${userProfile?.email || 'User'} (${activeRole})`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+            <span>{roles.find((r) => r.role === activeRole)?.label || activeRole}</span>
           </div>
 
           {/* User Auth Info / Login */}
@@ -479,7 +428,10 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
 
               <button
-                onClick={signOut}
+                onClick={async () => {
+                  await signOut();
+                  setCurrentTab('home');
+                }}
                 title="Sign Out"
                 className="p-2 rounded-xl bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 dark:bg-slate-800 dark:hover:bg-red-950/40 dark:text-slate-300 dark:hover:text-red-400 transition"
               >

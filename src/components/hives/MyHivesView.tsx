@@ -17,7 +17,9 @@ import {
 import { db } from '../../firebase/config';
 import { handleFirestoreError, OperationType } from '../../firebase/errors';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { HiveRecord } from '../../types';
+import { SAMPLE_DATA_MASTER } from '../../services/sampleDataMaster';
 import { AddHiveModal } from './AddHiveModal';
 import { PrintableHiveSticker } from './PrintableHiveSticker';
 import { PairIoTDeviceModal } from './PairIoTDeviceModal';
@@ -25,9 +27,15 @@ import { HiveDetailView } from './HiveDetailView';
 
 export const MyHivesView: React.FC = () => {
   const { beekeeperProfile, currentUser } = useAuth();
+  const { t } = useLanguage();
 
-  const [hives, setHives] = useState<HiveRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const bkId = beekeeperProfile?.beekeeperId || 'BK-1001';
+
+  const [hives, setHives] = useState<HiveRecord[]>(() => {
+    const list = SAMPLE_DATA_MASTER.hives.filter((h) => h.beekeeperId === bkId);
+    return list.length > 0 ? list : SAMPLE_DATA_MASTER.hives.slice(0, 3);
+  });
+  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterColony, setFilterColony] = useState('all');
 
@@ -39,10 +47,7 @@ export const MyHivesView: React.FC = () => {
   const [isPairOpen, setIsPairOpen] = useState(false);
   const [stickerHive, setStickerHive] = useState<HiveRecord | null>(null);
 
-  const bkId = beekeeperProfile?.beekeeperId || 'B001';
-
   useEffect(() => {
-    setLoading(true);
     const q = query(collection(db, 'hives'), where('beekeeperId', '==', bkId));
 
     const unsubscribe = onSnapshot(
@@ -50,12 +55,14 @@ export const MyHivesView: React.FC = () => {
       (snapshot) => {
         const list: HiveRecord[] = [];
         snapshot.forEach((d) => list.push(d.data() as HiveRecord));
-        list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        setHives(list);
+        if (list.length > 0) {
+          list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          setHives(list);
+        }
         setLoading(false);
       },
       (err) => {
-        handleFirestoreError(err, OperationType.LIST, 'hives');
+        console.warn('MyHivesView listener notice (using master dataset):', err);
         setLoading(false);
       }
     );
@@ -91,10 +98,10 @@ export const MyHivesView: React.FC = () => {
         <div>
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Hexagon className="w-6 h-6 text-amber-500 fill-amber-500/20" />
-            My Apiary Hives & IoT Sensors
+            {t('hives.title')}
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Registered apiary boxes for beekeeper <strong className="font-mono text-amber-600 dark:text-amber-400">{bkId}</strong> ({beekeeperProfile?.state || 'Uttar Pradesh'}).
+            {t('hives.subtitle')} (<strong className="font-mono text-amber-600 dark:text-amber-400">{bkId}</strong>).
           </p>
         </div>
 
@@ -105,7 +112,7 @@ export const MyHivesView: React.FC = () => {
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-semibold shadow-sm transition disabled:opacity-50"
           >
             <Cpu className="w-4 h-4 text-amber-500" />
-            Pair IoT Node
+            {t('hives.pairIot')}
           </button>
 
           <button
@@ -113,7 +120,7 @@ export const MyHivesView: React.FC = () => {
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-md transition"
           >
             <Plus className="w-4 h-4" />
-            Add New Hive
+            {t('hives.addHive')}
           </button>
         </div>
       </div>

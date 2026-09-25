@@ -14,6 +14,8 @@ import { LabProfile, LabSample, LabReport, LabTestParameters, BatchRecord } from
 import { recordLedgerBlock } from '../../services/blockchainService';
 import { logActivity } from '../../services/activityLogger';
 import { generateLabReportPdf } from '../../services/pdfService';
+import { useLanguage } from '../../context/LanguageContext';
+import { SAMPLE_DATA_MASTER } from '../../services/sampleDataMaster';
 import {
   FlaskConical,
   CheckCircle2,
@@ -35,13 +37,53 @@ interface LabPortalProps {
   userRole?: string;
 }
 
+const DEFAULT_LAB: LabProfile = {
+  id: 'LAB_CBRTI_PUNE',
+  userId: 'lab_cbrti_user',
+  labName: 'Central Bee Research & Training Institute (CBRTI) National Lab',
+  accreditationNo: 'NABL-TC-0841 • FSSAI-2024',
+  contactPerson: 'Dr. Ramesh K. Sharma',
+  email: 'cbrti.testing@honeychain.gov.in',
+  phone: '+91 20 2565 1204',
+  state: 'Maharashtra',
+  district: 'Pune',
+  address: '1153 Ganeshkhind Road, Shivajinagar, Pune, Maharashtra 411016',
+  status: 'approved',
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+};
+
+const SAMPLE_LAB_SAMPLES: LabSample[] = SAMPLE_DATA_MASTER.batches.slice(0, 16).map((b, idx) => ({
+  id: b.sampleId || `LS-2609-${1000 + idx}`,
+  sampleId: b.sampleId || `LS-2609-${1000 + idx}`,
+  batchId: b.batchId,
+  beekeeperId: b.beekeeperIds[0] || 'BK-1001',
+  labId: 'LAB_CBRTI_PUNE',
+  labName: 'Central Bee Research & Training Institute (CBRTI)',
+  floralSource: b.floralSource,
+  quantityMl: 250,
+  dispatchedAt: b.createdAt,
+  courierTracking: `DELHIVERY-LS-${1000 + idx}`,
+  status: idx < 5 ? 'dispatched' : idx < 9 ? 'in_testing' : 'completed',
+  reportId: b.labReportId,
+  isSample: true,
+  createdAt: b.createdAt,
+  updatedAt: b.updatedAt,
+}));
+
+const INITIAL_REPORTS_MAP: Record<string, LabReport> = {};
+SAMPLE_DATA_MASTER.labReports.forEach((r) => {
+  INITIAL_REPORTS_MAP[r.sampleId] = r;
+});
+
 export const LabPortal: React.FC<LabPortalProps> = ({ currentUserId, userRole }) => {
-  const [labs, setLabs] = useState<LabProfile[]>([]);
-  const [activeLab, setActiveLab] = useState<LabProfile | null>(null);
-  const [samples, setSamples] = useState<LabSample[]>([]);
+  const { t } = useLanguage();
+  const [labs, setLabs] = useState<LabProfile[]>([DEFAULT_LAB]);
+  const [activeLab, setActiveLab] = useState<LabProfile | null>(DEFAULT_LAB);
+  const [samples, setSamples] = useState<LabSample[]>(SAMPLE_LAB_SAMPLES);
   const [selectedSample, setSelectedSample] = useState<LabSample | null>(null);
-  const [reports, setReports] = useState<Record<string, LabReport>>({});
-  const [loading, setLoading] = useState<boolean>(true);
+  const [reports, setReports] = useState<Record<string, LabReport>>(INITIAL_REPORTS_MAP);
+  const [loading, setLoading] = useState<boolean>(false);
 
   // Form State for Recording Report
   const [showTestModal, setShowTestModal] = useState<boolean>(false);

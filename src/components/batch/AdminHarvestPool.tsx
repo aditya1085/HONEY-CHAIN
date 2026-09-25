@@ -183,7 +183,7 @@ export const AdminHarvestPool: React.FC<AdminHarvestPoolProps> = ({ onBatchCreat
         action: 'CREATE_BATCH',
         entityType: 'BATCH',
         entityId: batchId,
-        details: `Created batch ${batchId} combining ${harvestIdsToBatch.length} harvests (${totalKg.toFixed(1)}kg ${floral} honey from ${hiveIds.length} hives)`,
+        details: `Created batch ${batchId} combining ${harvestIdsToBatch.length} harvests (${(totalKg ?? 0).toFixed(1)}kg ${floral} honey from ${hiveIds.length} hives)`,
       });
 
       setSuccessMessage(`Successfully created Batch ${batchId}! Now ready for IoT verification gate.`);
@@ -332,7 +332,7 @@ export const AdminHarvestPool: React.FC<AdminHarvestPoolProps> = ({ onBatchCreat
           <div className="text-xs text-zinc-600 dark:text-zinc-400">
             Selected:{' '}
             <strong className="text-zinc-900 dark:text-zinc-100">
-              {selectedHarvestIds.length} harvests ({selectedTotalKg.toFixed(1)} kg)
+              {selectedHarvestIds.length} harvests ({(selectedTotalKg ?? 0).toFixed(1)} kg)
             </strong>
             {selectedAvgMoisture > 0 && (
               <span className="ml-2 text-zinc-400">| Avg Moisture: {selectedAvgMoisture}%</span>

@@ -4,6 +4,8 @@ import { db } from '../../firebase/config';
 import { BatchRecord } from '../../types';
 import { Layers, Search, Filter, Cpu, CheckCircle2, FlaskConical, Package, Eye, MapPin } from 'lucide-react';
 import { BatchDetailModal } from './BatchDetailModal';
+import { useLanguage } from '../../context/LanguageContext';
+import { SAMPLE_DATA_MASTER } from '../../services/sampleDataMaster';
 
 interface BatchListViewProps {
   onSelectBatch?: (batchId: string) => void;
@@ -14,8 +16,9 @@ export const BatchListView: React.FC<BatchListViewProps> = ({
   onSelectBatch,
   initialSelectedBatchId,
 }) => {
-  const [batches, setBatches] = useState<BatchRecord[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const { t } = useLanguage();
+  const [batches, setBatches] = useState<BatchRecord[]>(SAMPLE_DATA_MASTER.batches);
+  const [loading, setLoading] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [selectedBatch, setSelectedBatch] = useState<BatchRecord | null>(null);
@@ -27,11 +30,13 @@ export const BatchListView: React.FC<BatchListViewProps> = ({
       q,
       (snapshot) => {
         const list = snapshot.docs.map((d) => d.data() as BatchRecord);
-        setBatches(list);
+        if (list.length > 0) {
+          setBatches(list);
+        }
         setLoading(false);
 
         if (initialSelectedBatchId) {
-          const match = list.find((b) => b.batchId === initialSelectedBatchId);
+          const match = (list.length > 0 ? list : SAMPLE_DATA_MASTER.batches).find((b) => b.batchId === initialSelectedBatchId);
           if (match) {
             setSelectedBatch(match);
             setIsModalOpen(true);
@@ -39,12 +44,14 @@ export const BatchListView: React.FC<BatchListViewProps> = ({
         }
       },
       (err) => {
-        console.warn('Batches fallback query:', err);
+        console.warn('Batches fallback query (using master dataset):', err);
         const fallbackQ = collection(db, 'batches');
         onSnapshot(fallbackQ, (snap) => {
           const list = snap.docs.map((d) => d.data() as BatchRecord);
-          list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-          setBatches(list);
+          if (list.length > 0) {
+            list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            setBatches(list);
+          }
           setLoading(false);
         });
       }

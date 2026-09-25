@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, Mail, Lock, User, AlertCircle, Shield, Sparkles } from 'lucide-react';
+import { X, Mail, Lock, User, AlertCircle, Sparkles, ExternalLink, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { UserRole } from '../../types';
 
 interface AuthModalProps {
@@ -15,6 +16,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   initialMode = 'signin',
 }) => {
   const { signInWithGoogle, signInWithEmail, signUpWithEmail } = useAuth();
+  const { t } = useLanguage();
 
   const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
   const [email, setEmail] = useState('');
@@ -23,12 +25,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [role, setRole] = useState<UserRole>('BEEKEEPER');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isOperationNotAllowed, setIsOperationNotAllowed] = useState(false);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+    setIsOperationNotAllowed(false);
     setLoading(true);
 
     try {
@@ -39,14 +43,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
       onClose();
     } catch (err: unknown) {
-      console.error('Auth error:', err);
+      console.warn('Auth notice:', err);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (errMsg.includes('auth/operation-not-allowed') || errMsg.includes('operation-not-allowed')) {
+        setIsOperationNotAllowed(true);
+        setErrorMsg('Email/Password provider is not enabled in Firebase Authentication console.');
+        return;
+      }
       if (err instanceof Error) {
-        if (err.message.includes('auth/invalid-credential') || err.message.includes('wrong-password')) {
+        if (err.message.includes('auth/invalid-credential') || err.message.includes('wrong-password') || err.message.includes('user-not-found')) {
           setErrorMsg('Invalid email or password.');
         } else if (err.message.includes('auth/email-already-in-use')) {
           setErrorMsg('An account with this email already exists. Please sign in.');
         } else if (err.message.includes('auth/weak-password')) {
           setErrorMsg('Password should be at least 6 characters.');
+        } else if (err.message.includes('auth/invalid-email')) {
+          setErrorMsg('Please enter a valid email address.');
         } else {
           setErrorMsg(err.message);
         }
@@ -60,6 +72,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const handleGoogleSignIn = async () => {
     setErrorMsg(null);
+    setIsOperationNotAllowed(false);
     setLoading(true);
     try {
       await signInWithGoogle();
@@ -74,21 +87,30 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  // Demo accounts for effortless evaluation
+  // Demo accounts for effortless evaluation using real Firebase Auth
   const quickDemoLogin = async (demoEmail: string, demoPass: string, demoName: string, demoRole: UserRole) => {
     setErrorMsg(null);
+    setIsOperationNotAllowed(false);
     setLoading(true);
     try {
       try {
         await signInWithEmail(demoEmail, demoPass);
-      } catch {
-        // If demo user does not exist in Firebase Auth yet, auto-create
-        await signUpWithEmail(demoEmail, demoPass, demoName, demoRole);
+      } catch (authErr: any) {
+        // If demo user does not exist in Firebase Auth yet, auto-create real user in new project
+        try {
+          await signUpWithEmail(demoEmail, demoPass, demoName, demoRole);
+        } catch (createErr: any) {
+          throw createErr;
+        }
       }
       onClose();
     } catch (e: unknown) {
-      console.warn('Demo login note:', e);
-      if (e instanceof Error) setErrorMsg(e.message);
+      console.warn('Demo login notice:', e);
+      if (e instanceof Error) {
+        setErrorMsg(e.message);
+      } else {
+        setErrorMsg('Could not log in demo account.');
+      }
     } finally {
       setLoading(false);
     }
@@ -96,15 +118,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in">
-      <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl border border-amber-500/30 shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl border border-amber-500/30 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 bg-slate-950 text-white border-b border-slate-800">
+        <div className="flex items-center justify-between px-6 py-4 bg-slate-950 text-white border-b border-slate-800 shrink-0">
           <div>
             <h3 className="text-base font-bold text-amber-400">
-              {mode === 'signin' ? 'Sign in to Honey Chain' : 'Create Honey Chain Account'}
+              {mode === 'signin' ? t('auth.titleSignIn') : t('auth.titleSignUp')}
             </h3>
             <p className="text-xs text-slate-400">
-              Direct beekeeper-to-consumer traceability & marketplace
+              {t('auth.subtitle')}
             </p>
           </div>
           <button
@@ -115,8 +137,38 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
-          {errorMsg && (
+        <div className="p-6 space-y-4 overflow-y-auto">
+          {/* Operation Not Allowed Notice with exact console instructions */}
+          {isOperationNotAllowed && (
+            <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-2xl space-y-2 text-xs text-amber-900 dark:text-amber-200">
+              <div className="flex items-center gap-2 font-bold text-amber-800 dark:text-amber-300">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>{t('auth.operationNotAllowedTitle')}</span>
+              </div>
+              <p className="text-[11px] leading-relaxed">
+                Email/Password provider is currently not enabled in your Firebase project. To enable it:
+              </p>
+              <ol className="list-decimal list-inside space-y-1 text-[11px] font-medium pl-1">
+                <li>Open Firebase Console for project <strong className="font-mono">honeychain-production</strong></li>
+                <li>Go to <strong>Authentication &gt; Sign-in method</strong></li>
+                <li>Click <strong>Email/Password</strong> and toggle <strong>Enable</strong></li>
+                <li>Click <strong>Save</strong></li>
+              </ol>
+              <div className="pt-1">
+                <a
+                  href="https://console.firebase.google.com/project/honeychain-production/authentication/providers"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-400 hover:underline"
+                >
+                  <span>Open Firebase Auth Console</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            </div>
+          )}
+
+          {errorMsg && !isOperationNotAllowed && (
             <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 rounded-xl flex items-start gap-2 text-xs text-red-700 dark:text-red-300">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>{errorMsg}</span>
@@ -148,7 +200,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
               />
             </svg>
-            Continue with Google
+            <span>{t('auth.orGoogle')}</span>
           </button>
 
           <div className="flex items-center gap-2 my-2">
@@ -163,7 +215,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <>
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Display Name
+                    {t('auth.displayName')}
                   </label>
                   <div className="relative">
                     <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -172,7 +224,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       required
                       value={displayName}
                       onChange={(e) => setDisplayName(e.target.value)}
-                      placeholder="Your Name"
+                      placeholder={t('auth.displayNamePlaceholder')}
                       className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
                     />
                   </div>
@@ -180,25 +232,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Primary Role
+                    {t('auth.role')}
                   </label>
                   <select
                     value={role}
                     onChange={(e) => setRole(e.target.value as UserRole)}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
                   >
-                    <option value="BEEKEEPER">Beekeeper (Apiary Owner)</option>
-                    <option value="CONSUMER">Consumer (Honey Buyer)</option>
-                    <option value="LAB">Accredited Testing Lab</option>
-                    <option value="ADMIN">System Administrator</option>
+                    <option value="CONSUMER">{t('role.consumer')}</option>
+                    <option value="BEEKEEPER">{t('role.beekeeper')}</option>
                   </select>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
+                    * {t('auth.adminLabNotice') || 'Admin & Accredited Lab accounts are provisioned exclusively by platform administration.'}
+                  </p>
                 </div>
               </>
             )}
 
             <div>
               <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Email Address
+                {t('auth.email')}
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -207,7 +260,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="beekeeper@honeychain.in"
+                  placeholder={t('auth.emailPlaceholder')}
                   className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
                 />
               </div>
@@ -215,7 +268,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
             <div>
               <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Password
+                {t('auth.password')}
               </label>
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -224,7 +277,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder={t('auth.passwordPlaceholder')}
                   className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
                 />
               </div>
@@ -235,7 +288,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               disabled={loading}
               className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow transition disabled:opacity-50"
             >
-              {loading ? 'Authenticating...' : mode === 'signin' ? 'Sign In' : 'Create Account'}
+              {loading ? 'Authenticating...' : mode === 'signin' ? t('auth.submitSignIn') : t('auth.submitSignUp')}
             </button>
           </form>
 
@@ -243,24 +296,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <div className="text-center text-xs text-slate-500 pt-1">
             {mode === 'signin' ? (
               <p>
-                Don't have an account?{' '}
+                {t('auth.switchModeSignUp')}{' '}
                 <button
                   type="button"
                   onClick={() => setMode('signup')}
                   className="text-amber-600 dark:text-amber-400 font-bold hover:underline"
                 >
-                  Sign Up
+                  {t('auth.submitSignUp')}
                 </button>
               </p>
             ) : (
               <p>
-                Already have an account?{' '}
+                {t('auth.switchModeSignIn')}{' '}
                 <button
                   type="button"
                   onClick={() => setMode('signin')}
                   className="text-amber-600 dark:text-amber-400 font-bold hover:underline"
                 >
-                  Sign In
+                  {t('auth.submitSignIn')}
                 </button>
               </p>
             )}
@@ -269,9 +322,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {/* Quick 1-Click Demo Profiles */}
           <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-              <Sparkles className="w-3 h-3 text-amber-500" /> Quick Evaluation Personas
+              <Sparkles className="w-3 h-3 text-amber-500" />
+              <span>{t('auth.quickDemo')}</span>
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <button
                 type="button"
                 onClick={() =>
@@ -279,16 +333,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 }
                 className="p-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 text-[11px] font-semibold text-center border border-amber-500/20 transition"
               >
-                Beekeeper
+                {t('role.beekeeper')}
               </button>
               <button
                 type="button"
                 onClick={() =>
-                  quickDemoLogin('adityatripathi1085@gmail.com', 'AdminPass123!', 'Aditya (Super Admin)', 'ADMIN')
+                  quickDemoLogin('admin.honeychain@gmail.com', 'AdminPass123!', 'Aditya Tripathi (Admin)', 'ADMIN')
                 }
                 className="p-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 text-[11px] font-semibold text-center border border-amber-500/20 transition"
               >
-                Admin (Owner)
+                {t('role.admin')}
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  quickDemoLogin('lab.demo@honeychain.in', 'Demo1234!', 'NABL Analytical Lab', 'LAB')
+                }
+                className="p-2 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 text-teal-800 dark:text-teal-300 text-[11px] font-semibold text-center border border-teal-500/20 transition"
+              >
+                {t('role.lab')}
               </button>
               <button
                 type="button"
@@ -297,7 +360,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 }
                 className="p-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 text-[11px] font-semibold text-center border border-amber-500/20 transition"
               >
-                Consumer
+                {t('role.consumer')}
               </button>
             </div>
           </div>

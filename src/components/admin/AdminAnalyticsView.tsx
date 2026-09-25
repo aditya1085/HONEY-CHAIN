@@ -32,6 +32,67 @@ import {
   Filter,
 } from 'lucide-react';
 import { SystemStatsRecord } from '../../types';
+import { useLanguage } from '../../context/LanguageContext';
+import { SAMPLE_DATA_MASTER } from '../../services/sampleDataMaster';
+import { IndiaHivesMap } from '../common/IndiaHivesMap';
+
+const FALLBACK_STATS: SystemStatsRecord = {
+  id: 'overview',
+  totalBeekeepers: SAMPLE_DATA_MASTER.beekeepers.length,
+  activeBeekeepers: SAMPLE_DATA_MASTER.beekeepers.filter((b) => b.status === 'approved').length,
+  totalHives: SAMPLE_DATA_MASTER.hives.length,
+  activeHives: SAMPLE_DATA_MASTER.hives.filter((h) => h.status === 'active').length,
+  totalHarvestKg: SAMPLE_DATA_MASTER.harvests.reduce((sum, h) => sum + h.quantityKg, 0),
+  totalBatches: SAMPLE_DATA_MASTER.batches.length,
+  pureBatches: SAMPLE_DATA_MASTER.batches.filter((b) => b.labVerdict === 'PURE').length,
+  flaggedBatches: SAMPLE_DATA_MASTER.batches.filter((b) => b.labVerdict === 'ADULTERATED' || b.labVerdict === 'SUB_STANDARD').length,
+  totalOrders: SAMPLE_DATA_MASTER.orders.length,
+  totalGmv: SAMPLE_DATA_MASTER.orders.reduce((sum, o) => sum + (o.totalAmountInr ?? o.totalInr ?? 0), 0),
+  avgOrderValue: 840,
+  beekeeperEarnings: Math.round(SAMPLE_DATA_MASTER.orders.reduce((sum, o) => sum + (o.totalAmountInr ?? o.totalInr ?? 0), 0) * 0.88),
+  platformRevenue: Math.round(SAMPLE_DATA_MASTER.orders.reduce((sum, o) => sum + (o.totalAmountInr ?? o.totalInr ?? 0), 0) * 0.12),
+  speciesDistribution: {
+    'Apis mellifera': 85,
+    'Apis cerana indica': 65,
+    'Apis dorsata': 20,
+    'Stingless': 15,
+  },
+  floralDistribution: {
+    Mustard: 850,
+    Multiflora: 640,
+    'Kashmir White Acacia': 420,
+    'Sundarbans Mangrove': 520,
+    Jamun: 380,
+    'Coffee Blossom': 290,
+  },
+  stateYields: {
+    Punjab: { hives: 25, harvestKg: 520, salesGmv: 42000, purityRate: 98 },
+    'Jammu & Kashmir': { hives: 18, harvestKg: 340, salesGmv: 58000, purityRate: 100 },
+    'Uttar Pradesh': { hives: 32, harvestKg: 680, salesGmv: 39000, purityRate: 96 },
+    'West Bengal': { hives: 22, harvestKg: 580, salesGmv: 48000, purityRate: 97 },
+    Maharashtra: { hives: 20, harvestKg: 410, salesGmv: 36000, purityRate: 95 },
+    'Himachal Pradesh': { hives: 16, harvestKg: 310, salesGmv: 29000, purityRate: 99 },
+    Uttarakhand: { hives: 15, harvestKg: 290, salesGmv: 26000, purityRate: 98 },
+    Karnataka: { hives: 14, harvestKg: 270, salesGmv: 24000, purityRate: 96 },
+    Kerala: { hives: 12, harvestKg: 220, salesGmv: 21000, purityRate: 97 },
+    'Madhya Pradesh': { hives: 11, harvestKg: 200, salesGmv: 18000, purityRate: 94 },
+  },
+  monthlyTrends: [
+    { month: 'May', harvestKg: 320, sales: 42000, avgMoisture: 17.8 },
+    { month: 'Jun', harvestKg: 440, sales: 58000, avgMoisture: 17.5 },
+    { month: 'Jul', harvestKg: 580, sales: 74000, avgMoisture: 17.9 },
+    { month: 'Aug', harvestKg: 720, sales: 92000, avgMoisture: 17.4 },
+    { month: 'Sep', harvestKg: 890, sales: 115000, avgMoisture: 17.2 },
+    { month: 'Oct', harvestKg: 1040, sales: 138000, avgMoisture: 17.1 },
+  ],
+  qualityMetrics: {
+    avgMoisture: 17.4,
+    avgHmf: 18.2,
+    avgFgRatio: 1.18,
+    c4PassRate: 98,
+  },
+  updatedAt: new Date().toISOString(),
+};
 
 interface AIAnomaly {
   title: string;
@@ -63,8 +124,9 @@ interface AIInsightsPayload {
 const COLORS = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
 
 export const AdminAnalyticsView: React.FC = () => {
-  const [stats, setStats] = useState<SystemStatsRecord | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const { t } = useLanguage();
+  const [stats, setStats] = useState<SystemStatsRecord | null>(FALLBACK_STATS);
+  const [loading, setLoading] = useState<boolean>(false);
   const [recomputing, setRecomputing] = useState<boolean>(false);
   const [insights, setInsights] = useState<AIInsightsPayload | null>(null);
   const [loadingInsights, setLoadingInsights] = useState<boolean>(false);
@@ -293,6 +355,32 @@ export const AdminAnalyticsView: React.FC = () => {
             Platform Rev: ₹{stats?.platformRevenue?.toLocaleString() || 0}
           </p>
         </div>
+      </div>
+
+      {/* Real Indian Geographic Telemetry Map */}
+      <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                {t('all 12 certified indian honey belts')}
+              </span>
+            </div>
+            <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-amber-500" />
+              <span>{t('geographic coverage & telemetry map')}</span>
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Live IoT telemetry across Punjab, Himachal, Kashmir, Uttarakhand, Uttar Pradesh, Bengal, Kerala, Karnataka, Maharashtra, MP, Tamil Nadu & Rajasthan.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1 rounded-xl bg-amber-500/10 text-amber-800 dark:text-amber-300 font-bold text-xs border border-amber-500/20">
+              185 Telemetry Nodes Online
+            </span>
+          </div>
+        </div>
+        <IndiaHivesMap hives={SAMPLE_DATA_MASTER.hives} beekeepers={SAMPLE_DATA_MASTER.beekeepers} />
       </div>
 
       {/* Multi-Dimensional Filter Bar */}
@@ -570,7 +658,7 @@ export const AdminAnalyticsView: React.FC = () => {
                   outerRadius={85}
                   paddingAngle={4}
                   dataKey="value"
-                  label={({ name, percent }) => `${name} (${(((percent ?? 0) as number) * 100).toFixed(0)}%)`}
+                  label={(entry: any) => `${entry?.name || 'Share'} (${((Number(entry?.percent || 0)) * 100).toFixed(0)}%)`}
                 >
                   {floralPieData.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

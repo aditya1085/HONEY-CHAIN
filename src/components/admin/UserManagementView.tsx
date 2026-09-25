@@ -17,10 +17,13 @@ import {
 import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { UserProfile, UserRole } from '../../types';
+import { useLanguage } from '../../context/LanguageContext';
+import { SAMPLE_DATA_MASTER } from '../../services/sampleDataMaster';
 
 export const UserManagementView: React.FC = () => {
-  const [users, setUsers] = useState<UserProfile[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { t } = useLanguage();
+  const [users, setUsers] = useState<UserProfile[]>(SAMPLE_DATA_MASTER.users);
+  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
@@ -28,14 +31,15 @@ export const UserManagementView: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
-    setLoading(true);
     const unsub = onSnapshot(collection(db, 'users'), (snap) => {
       const list: UserProfile[] = snap.docs.map((d) => ({
         id: d.id,
         uid: d.id,
         ...(d.data() as Omit<UserProfile, 'id'>),
       }));
-      setUsers(list);
+      if (list.length > 0) {
+        setUsers(list);
+      }
       setLoading(false);
     });
 

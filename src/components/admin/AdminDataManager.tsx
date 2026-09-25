@@ -314,6 +314,7 @@ export const AdminDataManager: React.FC = () => {
   const [isImporting, setIsImporting] = useState<boolean>(false);
 
   // Sample Wizard & Reset
+  const [seedingBaseline, setSeedingBaseline] = useState<boolean>(false);
   const [generatingSample, setGeneratingSample] = useState<boolean>(false);
   const [clearingSample, setClearingSample] = useState<boolean>(false);
   const [resetToken, setResetToken] = useState<string>('');
@@ -485,6 +486,26 @@ export const AdminDataManager: React.FC = () => {
     }
   };
 
+  // Seed Production Baseline
+  const handleSeedBaseline = async () => {
+    setSeedingBaseline(true);
+    try {
+      const res = await fetch('/api/admin/data/seed-baseline', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        setActionNotice(data.message || 'Seeded baseline collections!');
+        fetchRecords();
+        setTimeout(() => setActionNotice(''), 6000);
+      } else {
+        alert(data.error || 'Failed to seed baseline');
+      }
+    } catch (e: any) {
+      alert(e?.message || 'Failed to seed baseline collections');
+    } finally {
+      setSeedingBaseline(false);
+    }
+  };
+
   // Generate Sample Data Wizard
   const handleGenerateSample = async () => {
     setGeneratingSample(true);
@@ -585,8 +606,8 @@ export const AdminDataManager: React.FC = () => {
     if (simAutoStream) {
       interval = setInterval(() => {
         // slight jitter
-        setSimTemp((t) => Number((t + (Math.random() * 0.4 - 0.2)).toFixed(1)));
-        setSimHumidity((h) => Number((h + (Math.random() * 0.6 - 0.3)).toFixed(1)));
+        setSimTemp((t) => Number(((t ?? 34.5) + (Math.random() * 0.4 - 0.2)).toFixed(1)));
+        setSimHumidity((h) => Number(((h ?? 62) + (Math.random() * 0.6 - 0.3)).toFixed(1)));
         handleSensorTick(false);
       }, 4000);
     }
@@ -897,7 +918,29 @@ export const AdminDataManager: React.FC = () => {
 
       {/* TAB 3: SAMPLE DATA GENERATOR WIZARD */}
       {activeTab === 'sample' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-emerald-500/20 shadow-sm space-y-4">
+            <div className="flex items-center gap-2 text-base font-black text-emerald-600 dark:text-emerald-400">
+              <Database className="w-5 h-5 text-emerald-500" />
+              <span>Production Baseline Setup</span>
+            </div>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Initializes essential production collections: atomic sequence counters (<span className="font-mono">beekeepers</span>, <span className="font-mono">hives</span>, <span className="font-mono">batches</span>, <span className="font-mono">jars</span>), species safe thresholds, platform economics (88/12), and NABL accredited labs.
+            </p>
+            <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 text-xs text-emerald-900 dark:text-emerald-300">
+              Run this once when connecting a new Firebase project to ensure all counters and thresholds exist.
+            </div>
+
+            <button
+              onClick={handleSeedBaseline}
+              disabled={seedingBaseline}
+              className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <Database className={`w-4 h-4 ${seedingBaseline ? 'animate-spin' : ''}`} />
+              <span>{seedingBaseline ? 'Initializing Baseline...' : 'Initialize Production Baseline'}</span>
+            </button>
+          </div>
+
           <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
             <div className="flex items-center gap-2 text-base font-black text-slate-900 dark:text-white">
               <Sparkles className="w-5 h-5 text-amber-500" />

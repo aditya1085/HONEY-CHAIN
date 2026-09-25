@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { HoneyListing, ReviewRecord, CartItem } from '../../types';
+import { useLanguage } from '../../context/LanguageContext';
 import {
   X,
   ShieldCheck,
@@ -45,6 +46,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onVerifyPack,
   currentUser,
 }) => {
+  const { t } = useLanguage();
   const [reviews, setReviews] = useState<ReviewRecord[]>([]);
   const [quantity, setQuantity] = useState<number>(1);
   const [rating, setRating] = useState<number>(5);
@@ -216,10 +218,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           <div className="space-y-1">
             <div className="flex items-center gap-2 font-bold text-xs text-amber-900 dark:text-amber-200">
               <ShieldCheck className="h-4 w-4 text-amber-600" />
-              <span>Full Blockchain Provenance & Lab Certificate Available</span>
+              <span>{t('Full Blockchain Provenance & Lab Certificate Available')}</span>
             </div>
-            <p className="text-xs text-zinc-600 dark:text-zinc-400">
-              This jar is cryptographically anchored. View live hive IoT history, NABL test parameters & SHA-256 seal.
+            <p className="text-xs text-slate-600 dark:text-slate-400">
+              {t('This jar is cryptographically anchored. View live hive IoT history, NABL test parameters & SHA-256 seal.')}
             </p>
           </div>
 
@@ -228,54 +230,54 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               onClose();
               onVerifyPack(listing.batchId);
             }}
-            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-zinc-900 px-4 py-2 text-xs font-bold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white shrink-0 shadow-sm"
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white shrink-0 shadow-sm"
           >
-            <span>Verify QR & Ledger</span>
+            <span>{t('verify.verifyButton')}</span>
             <ExternalLink className="h-3.5 w-3.5" />
           </button>
         </div>
 
         {/* Description & Beekeeper Note */}
         <div className="space-y-2">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-            About this Honey Harvest
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            {t('About this Honey Harvest')}
           </h4>
-          <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">
+          <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
             {listing.description}
           </p>
-          <div className="text-xs text-zinc-500 pt-1">
-            Harvested by master beekeeper{' '}
-            <strong className="text-zinc-800 dark:text-zinc-200">{listing.beekeeperName}</strong> in{' '}
-            {listing.state}. Net jar weight: <strong>{listing.jarSizeGrams}g</strong>.
+          <div className="text-xs text-slate-500 pt-1">
+            {t('Harvested by master beekeeper')}{' '}
+            <strong className="text-slate-800 dark:text-slate-200">{listing.beekeeperName}</strong> in{' '}
+            {t(listing.state)}. {t('Net jar weight')}: <strong>{listing.jarSizeGrams}g</strong>.
           </div>
         </div>
 
         {/* Pricing & Add to Cart Controls */}
-        <div className="rounded-2xl border border-zinc-200 bg-zinc-50/70 p-4 dark:border-zinc-800 dark:bg-zinc-800/40 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/40 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <div className="text-xs text-zinc-400 font-semibold">Special Direct Price</div>
+            <div className="text-xs text-slate-400 font-semibold">{t('Special Direct Price')}</div>
             <div className="flex items-baseline gap-2 mt-0.5">
-              <span className="text-3xl font-black text-zinc-900 dark:text-zinc-100">
+              <span className="text-3xl font-black text-slate-900 dark:text-slate-100">
                 ₹{listing.priceInr}
               </span>
               {listing.mrpInr > listing.priceInr && (
-                <span className="text-sm text-zinc-400 line-through">₹{listing.mrpInr}</span>
+                <span className="text-sm text-slate-400 line-through">₹{listing.mrpInr}</span>
               )}
               <span className="text-xs text-emerald-600 font-bold ml-1">
-                Inclusive of all taxes
+                {t('Inclusive of all taxes')}
               </span>
             </div>
-            <div className="text-xs text-zinc-500 mt-1 font-mono">
-              In Stock: <strong>{listing.stockCount} jars</strong>
+            <div className="text-xs text-slate-500 mt-1 font-mono">
+              {t('market.stock')} <strong>{listing.stockCount} jars</strong>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="flex items-center rounded-xl border border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-800">
+            <div className="flex items-center rounded-xl border border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-800">
               <button
                 type="button"
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="px-3 py-2 text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 font-bold"
+                className="px-3 py-2 text-slate-600 hover:text-slate-900 dark:text-slate-300 font-bold"
               >
                 -
               </button>
@@ -283,7 +285,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <button
                 type="button"
                 onClick={() => setQuantity(Math.min(listing.stockCount, quantity + 1))}
-                className="px-3 py-2 text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 font-bold"
+                className="px-3 py-2 text-slate-600 hover:text-slate-900 dark:text-slate-300 font-bold"
               >
                 +
               </button>
@@ -304,10 +306,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 });
                 onClose();
               }}
-              className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-6 py-3 text-xs font-bold text-white shadow-md shadow-amber-500/20 hover:bg-amber-600 transition"
+              className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-6 py-3 text-xs font-bold text-slate-950 shadow-md shadow-amber-500/20 hover:bg-amber-400 transition"
             >
               <ShoppingBag className="h-4 w-4" />
-              <span>Add to Cart (₹{listing.priceInr * quantity})</span>
+              <span>{t('action.addToCart')} (₹{listing.priceInr * quantity})</span>
             </button>
           </div>
         </div>
