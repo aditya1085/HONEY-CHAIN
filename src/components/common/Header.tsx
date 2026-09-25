@@ -22,6 +22,7 @@ import {
   Users,
   Settings,
   Activity,
+  MapPin,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -111,6 +112,19 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <FileCheck2 className="w-3.5 h-3.5 text-emerald-500" />
             <span>{t('nav.verify')}</span>
+          </button>
+
+          {/* Search by State / District (Accessible to Consumer, Admin, and Lab) */}
+          <button
+            onClick={() => setCurrentTab('search-region')}
+            className={`px-2.5 py-1.5 rounded-xl transition flex items-center gap-1.5 ${
+              currentTab === 'search-region'
+                ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold'
+                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <MapPin className="w-3.5 h-3.5 text-amber-500" />
+            <span>Search State/District</span>
           </button>
 
           {/* Beekeeper Links */}
@@ -249,6 +263,16 @@ export const Header: React.FC<HeaderProps> = ({
                     <div className="px-3 py-1 text-[10px] uppercase font-bold text-slate-400">
                       {t('nav.operations')}:
                     </div>
+                    <button
+                      onClick={() => {
+                        setCurrentTab('search-region');
+                        setAdminMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-amber-500/10 flex items-center gap-2 text-slate-700 dark:text-slate-200 font-bold"
+                    >
+                      <MapPin className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Search State / District</span>
+                    </button>
                     <button
                       onClick={() => {
                         setCurrentTab('admin-queue');

@@ -64,6 +64,8 @@ export interface HiveRecord {
   lat: number;
   lng: number;
   address: string;
+  state?: string;
+  district?: string;
   imageUrl?: string;
   setupDate: string;
   registrationDate: string;
@@ -230,11 +232,13 @@ export interface BatchRecord {
   id: string;
   batchId: string; // HB-2609-UP-0012
   state: string;
+  district?: string;
   beekeeperIds: string[];
   hiveIds: string[];
   harvestIds: string[];
   floralSource: string;
   totalQuantityKg: number;
+  totalWeightKg?: number;
   avgMoisture: number;
   status: BatchStatus;
   verificationDetails?: {
@@ -249,6 +253,7 @@ export interface BatchRecord {
   labName?: string;
   labReportId?: string;
   labVerdict?: 'PURE' | 'ADULTERATED' | 'SUB_STANDARD';
+  purityPercentage?: number;
   reportHash?: string;
   packagingDetails?: {
     jarSizeGrams: number;
@@ -321,13 +326,18 @@ export interface LabReport {
   reportId: string;
   sampleId: string;
   batchId: string;
+  state?: string;
+  district?: string;
   labId: string;
   labName: string;
   accreditationNo: string;
   testedBy: string;
+  analystName?: string;
   testDate: string;
   parameters: LabTestParameters;
   verdict: 'PURE' | 'ADULTERATED' | 'SUB_STANDARD';
+  purityPercentage?: number;
+  passFail?: 'Pass' | 'Fail';
   remarks: string;
   pdfUrl?: string;
   reportHash: string; // SHA-256 hash of report parameters + batchId + sampleId

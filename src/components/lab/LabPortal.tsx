@@ -16,6 +16,7 @@ import { logActivity } from '../../services/activityLogger';
 import { generateLabReportPdf } from '../../services/pdfService';
 import { useLanguage } from '../../context/LanguageContext';
 import { SAMPLE_DATA_MASTER } from '../../services/sampleDataMaster';
+import { StateDistrictSearch } from '../common/StateDistrictSearch';
 import {
   FlaskConical,
   CheckCircle2,
@@ -30,6 +31,7 @@ import {
   Scale,
   Sparkles,
   Lock,
+  MapPin,
 } from 'lucide-react';
 
 interface LabPortalProps {
@@ -84,6 +86,9 @@ export const LabPortal: React.FC<LabPortalProps> = ({ currentUserId, userRole })
   const [selectedSample, setSelectedSample] = useState<LabSample | null>(null);
   const [reports, setReports] = useState<Record<string, LabReport>>(INITIAL_REPORTS_MAP);
   const [loading, setLoading] = useState<boolean>(false);
+
+  // Tab mode: Testing Queue vs State/District Regional Search
+  const [activeLabTab, setActiveLabTab] = useState<'queue' | 'regional_search'>('queue');
 
   // Form State for Recording Report
   const [showTestModal, setShowTestModal] = useState<boolean>(false);
@@ -374,7 +379,38 @@ export const LabPortal: React.FC<LabPortalProps> = ({ currentUserId, userRole })
         </div>
       )}
 
-      {/* Assigned Samples Queue */}
+      {/* Lab Sub-navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2">
+        <button
+          onClick={() => setActiveLabTab('queue')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition ${
+            activeLabTab === 'queue'
+              ? 'bg-teal-600 text-white shadow-sm'
+              : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+          }`}
+        >
+          <FlaskConical className="w-4 h-4" />
+          <span>Samples Queue & Test Certification ({samples.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveLabTab('regional_search')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition ${
+            activeLabTab === 'regional_search'
+              ? 'bg-teal-600 text-white shadow-sm'
+              : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+          }`}
+        >
+          <MapPin className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+          <span>Search by State / District (Territory Lab Reports & Purity)</span>
+        </button>
+      </div>
+
+      {activeLabTab === 'regional_search' ? (
+        <StateDistrictSearch role="LAB" />
+      ) : (
+        <>
+          {/* Assigned Samples Queue */}
       <div className="rounded-2xl border border-zinc-200 bg-white shadow-xs dark:border-zinc-800 dark:bg-zinc-900 p-5 space-y-4">
         <div className="flex items-center justify-between">
           <div>
@@ -508,6 +544,8 @@ export const LabPortal: React.FC<LabPortalProps> = ({ currentUserId, userRole })
           </div>
         )}
       </div>
+        </>
+      )}
 
       {/* Enter Test Results Modal */}
       {showTestModal && selectedSample && (

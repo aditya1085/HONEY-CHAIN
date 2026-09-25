@@ -335,6 +335,8 @@ export function generateMasterDataset(): MasterSampleDataset {
         lat: Number((lat + (h * 0.006) - 0.003).toFixed(4)),
         lng: Number((lng + (h * 0.006) - 0.003).toFixed(4)),
         address: `${districtObj.name}, ${region.state}`,
+        state: region.state,
+        district: districtObj.name,
         setupDate: new Date(Date.now() - (75 * 86400000)).toISOString().split('T')[0],
         registrationDate: new Date(Date.now() - (45 * 86400000)).toISOString().split('T')[0],
         expectedProduction: 16 + ((hiveSequence * 3) % 24),
@@ -438,7 +440,7 @@ export function generateMasterDataset(): MasterSampleDataset {
       }
 
       // Generate Harvests
-      if (hiveStatus === 'active' && h === 0 && harvestSequence <= 85) {
+      if (hiveStatus === 'active' && (h === 0 || harvestSequence <= 120)) {
         const harvestId = `HVST-${(1000 + harvestSequence).toString()}`;
         const harvestDoc: HarvestRecord = {
           id: harvestId,
@@ -472,10 +474,30 @@ export function generateMasterDataset(): MasterSampleDataset {
 
   for (let b = 1; b <= TOTAL_BATCHES; b++) {
     const region = INDIAN_BEEKEEPING_REGIONS[(b - 1) % INDIAN_BEEKEEPING_REGIONS.length];
-    const districtObj = region.districts[(b - 1) % region.districts.length];
+    const distIdx = Math.floor((b - 1) / INDIAN_BEEKEEPING_REGIONS.length) % region.districts.length;
+    const districtObj = region.districts[distIdx];
     const stCode = region.state.slice(0, 2).toUpperCase();
     const batchId = `HB-2609-${stCode}-${(1000 + b).toString()}`;
-    const bkAssigned = dataset.beekeepers[(b * 2) % dataset.beekeepers.length];
+    
+    // Find beekeepers in this exact state and district
+    const bkInDistrict = dataset.beekeepers.filter(
+      (bk) => bk.state === region.state && bk.district === districtObj.name
+    );
+    const bkAssigned = bkInDistrict.length > 0
+      ? bkInDistrict[(b - 1) % bkInDistrict.length]
+      : dataset.beekeepers[(b * 2) % dataset.beekeepers.length];
+
+    const hivesInDistrict = dataset.hives.filter(
+      (h) => h.state === region.state && h.district === districtObj.name
+    );
+    const hiveIds = hivesInDistrict.slice(0, 2).map((h) => h.hiveId);
+    if (hiveIds.length === 0) hiveIds.push(`HV-${(1000 + b).toString()}`);
+
+    const harvestsInDistrict = dataset.harvests.filter(
+      (hv) => hv.state === region.state && hv.district === districtObj.name
+    );
+    const harvestIds = harvestsInDistrict.slice(0, 2).map((hv) => hv.id);
+    if (harvestIds.length === 0) harvestIds.push(`HVST-${(1000 + b).toString()}`);
 
     // Status distribution matching prompt:
     // Draft: 6, Verified: 8, Sent to Lab: 8, Report Received: 10, Live: 12, Sold Out: 6, Rejected: 2
@@ -510,22 +532,37 @@ export function generateMasterDataset(): MasterSampleDataset {
     const sampleId = `LS-2609-${(1000 + b).toString()}`;
     const reportHash = `hash_${b}_${labVerdict.toLowerCase()}_${moisture}_verified`;
 
+    const purityPercentage = labVerdict === 'PURE'
+      ? Number((95.2 + ((b * 1.7) % 4.3)).toFixed(1))
+      : (labVerdict === 'SUB_STANDARD' ? 88.4 : 74.2);
+
+    const labNames = [
+      'Central Bee Research & Training Institute (CBRTI) National Lab',
+      'Apex Regional Honey Quality & Residue Testing Lab',
+      'National Bee Board Honey Traceability Center of Excellence',
+    ];
+    const assignedLabName = labNames[(b - 1) % labNames.length];
+    const assignedLabId = (b - 1) % 3 === 0 ? 'LAB_CBRTI_PUNE' : ((b - 1) % 3 === 1 ? 'LAB_APEX_LUCKNOW' : 'LAB_NBB_DELHI');
+
     const batchDoc: BatchRecord = {
       id: batchId,
       batchId,
       state: region.state,
+      district: districtObj.name,
       beekeeperIds: [bkAssigned.beekeeperId || 'BK-1001'],
-      hiveIds: [`HV-${(1000 + b).toString()}`, `HV-${(1001 + b).toString()}`],
-      harvestIds: [`HVST-${(1000 + b).toString()}`],
+      hiveIds,
+      harvestIds,
       floralSource: districtObj.flora,
       totalQuantityKg: 65 + ((b * 8) % 115),
+      totalWeightKg: 65 + ((b * 8) % 115),
       avgMoisture: Number(moisture.toFixed(1)),
       status: bStatus,
       sampleId,
-      labId: 'LAB_CBRTI_PUNE',
-      labName: 'Central Bee Research & Training Institute (CBRTI)',
+      labId: assignedLabId,
+      labName: assignedLabName,
       labReportId: bStatus !== 'created' && bStatus !== 'verified' ? reportId : undefined,
       labVerdict: bStatus !== 'created' && bStatus !== 'verified' ? labVerdict : undefined,
+      purityPercentage: bStatus !== 'created' && bStatus !== 'verified' ? purityPercentage : undefined,
       reportHash: bStatus !== 'created' && bStatus !== 'verified' ? reportHash : undefined,
       packagingDetails: (bStatus === 'listed' || bStatus === 'completed') ? {
         jarSizeGrams: (b % 2 === 0) ? 500 : 250,
@@ -546,10 +583,14 @@ export function generateMasterDataset(): MasterSampleDataset {
         reportId,
         sampleId,
         batchId,
-        labId: 'LAB_CBRTI_PUNE',
-        labName: 'Central Bee Research & Training Institute (CBRTI) National Lab',
-        accreditationNo: 'NABL-TC-0841 • FSSAI-2024',
-        testedBy: 'Dr. Ramesh K. Sharma, Chief Honey Testing Officer',
+        state: region.state,
+        district: districtObj.name,
+        labId: assignedLabId,
+        labName: assignedLabName,
+        accreditationNo: (b - 1) % 3 === 0 ? 'NABL-TC-0841 • FSSAI-2024' : ((b - 1) % 3 === 1 ? 'NABL-TC-1120 • FSSAI-UP-44' : 'NABL-TC-0992 • MOA-NBB-09'),
+        testedBy: (b - 1) % 3 === 0
+          ? 'Dr. Ramesh K. Sharma, Chief Honey Testing Officer'
+          : ((b - 1) % 3 === 1 ? 'Dr. Sunita Verma, Lead Residue Chemist' : 'Er. Alok Tripathi, Traceability Scientist'),
         testDate: new Date(Date.now() - (6 * 86400000)).toISOString().split('T')[0],
         parameters: {
           moisture: Number(moisture.toFixed(1)),
@@ -564,6 +605,8 @@ export function generateMasterDataset(): MasterSampleDataset {
           heavyMetals: 'Pass',
         },
         verdict: labVerdict,
+        purityPercentage,
+        passFail: labVerdict === 'PURE' ? 'Pass' : 'Fail',
         remarks: labVerdict === 'PURE'
           ? 'Passed all 18 FSSAI quality parameters. Zero exogenous C4/C3 sugars detected. High pollen density confirms genuine unpasteurized origin.'
           : (labVerdict === 'SUB_STANDARD'

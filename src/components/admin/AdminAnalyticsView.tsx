@@ -35,6 +35,7 @@ import { SystemStatsRecord } from '../../types';
 import { useLanguage } from '../../context/LanguageContext';
 import { SAMPLE_DATA_MASTER } from '../../services/sampleDataMaster';
 import { IndiaHivesMap } from '../common/IndiaHivesMap';
+import { StateDistrictSearch } from '../common/StateDistrictSearch';
 
 const FALLBACK_STATS: SystemStatsRecord = {
   id: 'overview',
@@ -130,6 +131,9 @@ export const AdminAnalyticsView: React.FC = () => {
   const [recomputing, setRecomputing] = useState<boolean>(false);
   const [insights, setInsights] = useState<AIInsightsPayload | null>(null);
   const [loadingInsights, setLoadingInsights] = useState<boolean>(false);
+
+  // Tab switcher: High-level analytics vs Deep State/District search
+  const [activeAdminTab, setActiveAdminTab] = useState<'analytics' | 'regional_search'>('analytics');
 
   // Filters state
   const [filterState, setFilterState] = useState<string>('ALL');
@@ -270,7 +274,38 @@ export const AdminAnalyticsView: React.FC = () => {
         </div>
       </div>
 
-      {/* KPI Metric Cards Grid */}
+      {/* Admin Sub-navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+        <button
+          onClick={() => setActiveAdminTab('analytics')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition ${
+            activeAdminTab === 'analytics'
+              ? 'bg-amber-500 text-slate-950 shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <TrendingUp className="w-4 h-4" />
+          <span>Platform Overview & Telemetry</span>
+        </button>
+
+        <button
+          onClick={() => setActiveAdminTab('regional_search')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition ${
+            activeAdminTab === 'regional_search'
+              ? 'bg-amber-500 text-slate-950 shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <MapPin className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+          <span>Search by State / District (Apiary Audit, Hives & Lab Purity Reports)</span>
+        </button>
+      </div>
+
+      {activeAdminTab === 'regional_search' ? (
+        <StateDistrictSearch role="ADMIN" />
+      ) : (
+        <>
+          {/* KPI Metric Cards Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
         {/* Total Beekeepers */}
         <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
@@ -762,6 +797,8 @@ export const AdminAnalyticsView: React.FC = () => {
           </table>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };

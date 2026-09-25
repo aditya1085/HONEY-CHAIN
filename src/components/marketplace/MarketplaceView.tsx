@@ -4,6 +4,7 @@ import { db } from '../../firebase/config';
 import { HoneyListing, CartItem, StockAlert } from '../../types';
 import { useLanguage } from '../../context/LanguageContext';
 import { SAMPLE_DATA_MASTER } from '../../services/sampleDataMaster';
+import { StateDistrictSearch } from '../common/StateDistrictSearch';
 import {
   Search,
   ShoppingBag,
@@ -82,6 +83,7 @@ const STATE_CODE_MAP: Record<string, string> = {
 
 export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
   onAddToCart,
+  onVerifyPack,
   onOpenProductDetail,
   onSelectListing,
   currentUser,
@@ -109,6 +111,9 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
   const [showNotifyModal, setShowNotifyModal] = useState<boolean>(false);
   const [notifyEmail, setNotifyEmail] = useState<string>(currentUser?.email || '');
   const [notifySuccess, setNotifySuccess] = useState<string>('');
+
+  // Primary consumer view mode: catalog vs state/district regional search
+  const [activeMarketTab, setActiveMarketTab] = useState<'catalog' | 'regional'>('catalog');
 
   useEffect(() => {
     // Listen to all active listings (or listings where status is undefined/sample)
@@ -257,6 +262,14 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
         <div className="flex flex-col sm:flex-row items-center gap-3">
           <button
+            onClick={() => setActiveMarketTab(activeMarketTab === 'catalog' ? 'regional' : 'catalog')}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-400/25 border border-white/30 px-5 py-3 text-xs font-bold text-white shadow-md hover:bg-white/30 transition"
+          >
+            <MapPin className="h-4 w-4 text-amber-200" />
+            <span>{activeMarketTab === 'catalog' ? 'Search by State/District' : 'View Honey Catalog'}</span>
+          </button>
+
+          <button
             onClick={() => setShowNotifyModal(true)}
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-xs font-bold text-amber-900 shadow-md hover:bg-amber-50 transition"
           >
@@ -266,7 +279,41 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
         </div>
       </div>
 
-      {/* Filter and Search Toolbar */}
+      {/* Mode Switcher Tabs for Consumer Dashboard */}
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+        <button
+          onClick={() => setActiveMarketTab('catalog')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition ${
+            activeMarketTab === 'catalog'
+              ? 'bg-amber-500 text-slate-950 shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <ShoppingBag className="w-4 h-4" />
+          <span>Honey Jars Catalog ({filteredListings.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveMarketTab('regional')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition ${
+            activeMarketTab === 'regional'
+              ? 'bg-amber-500 text-slate-950 shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <MapPin className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+          <span>Search by State / District (Apiaries, Hives & Lab Purity)</span>
+        </button>
+      </div>
+
+      {activeMarketTab === 'regional' ? (
+        <StateDistrictSearch
+          role="CONSUMER"
+          onSelectBatch={(batchId) => onVerifyPack(batchId)}
+        />
+      ) : (
+        <>
+          {/* Filter and Search Toolbar */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-4">
         {/* Search Bar & Sorter */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -530,6 +577,8 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
             );
           })}
         </div>
+      )}
+        </>
       )}
 
       {/* Notify Me Modal */}

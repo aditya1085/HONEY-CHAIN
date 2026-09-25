@@ -36,6 +36,7 @@ import { MarketplaceModeration } from './components/admin/MarketplaceModeration'
 import { UserManagementView } from './components/admin/UserManagementView';
 import { PlatformSettingsView } from './components/admin/PlatformSettingsView';
 import { AdminDataManager } from './components/admin/AdminDataManager';
+import { StateDistrictSearch } from './components/common/StateDistrictSearch';
 import { BeeAssistantWidget } from './components/common/BeeAssistantWidget';
 import { seedPhase3Data } from './services/seedPhase3';
 import { seedPhase4Data } from './services/seedPhase4';
@@ -498,6 +499,17 @@ const MainContent: React.FC = () => {
         {currentTab === 'activity-logs' && <ActivityLogViewer />}
 
         {currentTab === 'id-engine' && <IdGeneratorsTest />}
+
+        {/* Search by State / District (Accessible to Consumer, Admin, and Lab) */}
+        {currentTab === 'search-region' && (
+          <StateDistrictSearch
+            role={activeRole}
+            onSelectBatch={(bId) => {
+              setSelectedBatchId(bId);
+              setCurrentTab('batches');
+            }}
+          />
+        )}
           </>
         )}
       </main>

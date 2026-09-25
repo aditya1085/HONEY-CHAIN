@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Camera, QrCode, Store, Package, TrendingUp, FlaskConical } from 'lucide-react';
+import { ShieldCheck, Camera, QrCode, Store, Package, TrendingUp, FlaskConical, MapPin } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 
@@ -86,6 +86,18 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       >
         <QrCode className="w-5 h-5" />
         <span className="text-[10px]">{t('nav.verify')}</span>
+      </button>
+
+      {/* State / District Search */}
+      <button
+        onClick={() => setCurrentTab('search-region')}
+        className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition ${
+          currentTab === 'search-region' ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-slate-500 dark:text-slate-400'
+        }`}
+        title="Search by State/District"
+      >
+        <MapPin className="w-5 h-5" />
+        <span className="text-[10px]">State/Dist</span>
       </button>
 
       {/* Orders */}
