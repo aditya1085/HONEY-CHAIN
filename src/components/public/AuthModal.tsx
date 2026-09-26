@@ -40,6 +40,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [role, setRole] = useState<UserRole>('BEEKEEPER');
+  const [signInAuthority, setSignInAuthority] = useState<UserRole>(() => {
+    return (localStorage.getItem('hc_last_signup_role') as UserRole) || 'BEEKEEPER';
+  });
 
   // Beekeeper Profile Fields
   const [phone, setPhone] = useState('');
@@ -92,7 +95,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     try {
       if (mode === 'signin') {
-        await signInWithEmail(email, password);
+        await signInWithEmail(email, password, signInAuthority);
       } else {
         let bkDetails: BeekeeperSignupData | undefined = undefined;
 
@@ -485,6 +488,67 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </div>
                 )}
               </>
+            )}
+
+            {mode === 'signin' && (
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Login Authority / Portal
+                </label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSignInAuthority('BEEKEEPER')}
+                    className={`p-2 rounded-xl border text-[11px] font-bold text-left transition flex items-center gap-1.5 cursor-pointer ${
+                      signInAuthority === 'BEEKEEPER'
+                        ? 'border-amber-500 bg-amber-500/15 text-amber-900 dark:text-amber-300'
+                        : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                    }`}
+                  >
+                    <span>🐝</span>
+                    <span className="truncate">Beekeeper Portal</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSignInAuthority('CONSUMER')}
+                    className={`p-2 rounded-xl border text-[11px] font-bold text-left transition flex items-center gap-1.5 cursor-pointer ${
+                      signInAuthority === 'CONSUMER'
+                        ? 'border-amber-500 bg-amber-500/15 text-amber-900 dark:text-amber-300'
+                        : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                    }`}
+                  >
+                    <span>🛒</span>
+                    <span className="truncate">Consumer</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSignInAuthority('LAB')}
+                    className={`p-2 rounded-xl border text-[11px] font-bold text-left transition flex items-center gap-1.5 cursor-pointer ${
+                      signInAuthority === 'LAB'
+                        ? 'border-teal-500 bg-teal-500/15 text-teal-900 dark:text-teal-300'
+                        : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                    }`}
+                  >
+                    <span>🔬</span>
+                    <span className="truncate">Accredited Lab</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSignInAuthority('ADMIN')}
+                    className={`p-2 rounded-xl border text-[11px] font-bold text-left transition flex items-center gap-1.5 cursor-pointer ${
+                      signInAuthority === 'ADMIN'
+                        ? 'border-purple-500 bg-purple-500/15 text-purple-900 dark:text-purple-300'
+                        : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                    }`}
+                  >
+                    <span>🛡️</span>
+                    <span className="truncate">Admin</span>
+                  </button>
+                </div>
+              </div>
             )}
 
             <div>

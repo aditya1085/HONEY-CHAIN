@@ -3826,7 +3826,7 @@ app.post('/api/sensor-simulator/tick', async (req: Request, res: Response) => {
 ========================================================================= */
 
 async function startServer() {
-  const isProduction = process.env.NODE_ENV === 'production' || fs.existsSync(path.resolve('dist/index.html'));
+  const isProduction = process.env.NODE_ENV === 'production';
 
   if (isProduction) {
     console.log('[Honey Chain] Production mode active: serving static bundle from dist/');
@@ -3839,7 +3839,7 @@ async function startServer() {
       console.log('[Honey Chain] Development mode active: mounting Vite middleware');
       const { createServer } = await import('vite');
       const vite = await createServer({
-        server: { middlewareMode: true },
+        server: { middlewareMode: true, allowedHosts: true },
         appType: 'spa',
       });
       app.use(vite.middlewares);

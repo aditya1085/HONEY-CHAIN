@@ -112,20 +112,24 @@ export const AdminHivesManagement: React.FC = () => {
     }
   };
 
-  const filteredHives = hives.filter(
-    (h) =>
-      h.hiveId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      h.beekeeperId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      h.colonyType.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      h.area.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredHives = hives.filter((h) => {
+    const s = searchTerm.toLowerCase();
+    return (
+      (h.hiveId || '').toLowerCase().includes(s) ||
+      (h.beekeeperId || '').toLowerCase().includes(s) ||
+      (h.colonyType || '').toLowerCase().includes(s) ||
+      (h.area || '').toLowerCase().includes(s)
+    );
+  });
 
-  const filteredDevices = devices.filter(
-    (d) =>
-      d.deviceSerial.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      d.hiveId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      d.beekeeperId.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredDevices = devices.filter((d) => {
+    const s = searchTerm.toLowerCase();
+    return (
+      (d.deviceSerial || '').toLowerCase().includes(s) ||
+      (d.hiveId || '').toLowerCase().includes(s) ||
+      (d.beekeeperId || '').toLowerCase().includes(s)
+    );
+  });
 
   return (
     <div className="space-y-6">
@@ -246,15 +250,30 @@ export const AdminHivesManagement: React.FC = () => {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          hive.status === 'active'
-                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                            : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                        }`}
-                      >
-                        {hive.status.toUpperCase()}
-                      </span>
+                      <div className="space-y-1">
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            hive.status === 'active'
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                              : hive.approvalStatus === 'rejected'
+                              ? 'bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300'
+                              : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                          }`}
+                        >
+                          {(hive.status || 'inactive').toUpperCase()}
+                        </span>
+                        {hive.approvalStage && hive.approvalStage !== 'COMPLETED' && (
+                          <div className="text-[10px] font-mono text-slate-500">
+                            {hive.approvalStage === 'STAGE_1_ADMIN_REVIEW'
+                              ? 'Stage 1 Review'
+                              : hive.approvalStage === 'STAGE_2_LAB_VERIFICATION'
+                              ? 'Stage 2 at Lab'
+                              : hive.approvalStage === 'STAGE_3_ADMIN_FINAL'
+                              ? 'Stage 2 Final Decision'
+                              : ''}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-right space-x-2">
                       <button

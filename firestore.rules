@@ -83,7 +83,7 @@ service cloud.firestore {
         && data.id is string && data.id.size() <= 128
         && data.hiveId is string && data.hiveId.size() <= 64
         && data.beekeeperId is string && data.beekeeperId.size() <= 32
-        && data.status in ['active', 'inactive', 'decommissioned'];
+        && data.status in ['active', 'inactive', 'decommissioned', 'pending'];
     }
 
     function isValidActivityLog(data) {
@@ -116,7 +116,7 @@ service cloud.firestore {
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
       allow create: if isOwner(userId) && isValidUser(incoming());
-      allow update: if (isOwner(userId) && isValidUser(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'beekeeperId', 'labId', 'updatedAt'])) || isAdmin();
+      allow update: if (isOwner(userId) && isValidUser(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'beekeeperId', 'labId', 'role', 'updatedAt']) && incoming().role in ['CONSUMER', 'BEEKEEPER']) || isAdmin();
       allow delete: if isAdmin();
     }
 

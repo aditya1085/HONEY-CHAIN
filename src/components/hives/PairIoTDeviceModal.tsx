@@ -25,8 +25,9 @@ export const PairIoTDeviceModal: React.FC<PairIoTDeviceModalProps> = ({
 }) => {
   const { beekeeperProfile, currentUser } = useAuth();
 
+  const activeHives = hives.filter((h) => h.status === 'active' && h.approvalStatus !== 'rejected');
   const [deviceSerial, setDeviceSerial] = useState('');
-  const [selectedHiveId, setSelectedHiveId] = useState(initialHiveId || hives[0]?.hiveId || '');
+  const [selectedHiveId, setSelectedHiveId] = useState(initialHiveId || activeHives[0]?.hiveId || '');
   const [deviceModel, setDeviceModel] = useState('HoneyNode ESP32-S3 (Temp/Hum/Weight)');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -216,17 +217,23 @@ export const PairIoTDeviceModal: React.FC<PairIoTDeviceModalProps> = ({
                 <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Target Hive *
                 </label>
-                <select
-                  value={selectedHiveId}
-                  onChange={(e) => setSelectedHiveId(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
-                >
-                  {hives.map((h) => (
-                    <option key={h.hiveId} value={h.hiveId}>
-                      {h.hiveId} — {h.colonyType} ({h.area})
-                    </option>
-                  ))}
-                </select>
+                {activeHives.length === 0 ? (
+                  <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-[11px]">
+                    No active hives ready for pairing. Hives must pass Stage 1 Admin Review and Stage 2 Lab Health Verification before IoT pairing.
+                  </div>
+                ) : (
+                  <select
+                    value={selectedHiveId}
+                    onChange={(e) => setSelectedHiveId(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
+                  >
+                    {activeHives.map((h) => (
+                      <option key={h.hiveId} value={h.hiveId}>
+                        {h.hiveId} — {h.colonyType} ({h.area})
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div>

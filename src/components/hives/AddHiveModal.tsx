@@ -38,6 +38,7 @@ export const AddHiveModal: React.FC<AddHiveModalProps> = ({ isOpen, onClose, onS
 
   // Sticker preview modal state upon successful creation
   const [createdHive, setCreatedHive] = useState<HiveRecord | null>(null);
+  const [showSticker, setShowSticker] = useState(false);
 
   if (!isOpen) return null;
 
@@ -109,12 +110,15 @@ export const AddHiveModal: React.FC<AddHiveModalProps> = ({ isOpen, onClose, onS
         lat,
         lng,
         address: address.trim(),
+        state,
+        district: beekeeperProfile?.district || '',
         imageUrl: imageUrl || undefined,
         setupDate,
         registrationDate: new Date().toISOString(),
         expectedProduction: Number(expectedProduction) || 15,
-        status: 'active',
-        approvalStatus: 'approved',
+        status: 'inactive',
+        approvalStatus: 'pending',
+        approvalStage: 'STAGE_1_ADMIN_REVIEW',
         isSample: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -142,17 +146,32 @@ export const AddHiveModal: React.FC<AddHiveModalProps> = ({ isOpen, onClose, onS
           lat,
           lng,
           registrationDate: hiveData.registrationDate,
+          approvalStage: 'STAGE_1_ADMIN_REVIEW',
         });
       } catch (ledgerErr) {
         console.warn('Ledger block anchoring warning (continuing):', ledgerErr);
       }
 
-      // 4. Log Activity
+      // 4. Create in-app notification for Beekeeper
+      try {
+        const notifId = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        await setDoc(doc(db, 'notifications', notifId), {
+          id: notifId,
+          userId: currentUser?.uid || bkId,
+          title: '📋 Hive Submitted for Stage 1 Review',
+          message: `Hive ${hiveId} has been successfully submitted and is now awaiting Stage 1 Admin Review. After admin approval, an accredited laboratory will conduct health verification before final live activation.`,
+          type: 'INFO',
+          read: false,
+          createdAt: new Date().toISOString(),
+        });
+      } catch {}
+
+      // 5. Log Activity
       await logActivity({
-        action: 'HIVE_REGISTERED',
+        action: 'HIVE_SUBMITTED_FOR_REVIEW',
         entityType: 'HIVE',
         entityId: hiveId,
-        details: `Hive ${hiveId} (${colonyType}) registered in ${area} by beekeeper ${bkId}`,
+        details: `Hive ${hiveId} (${colonyType}) submitted for Stage 1 Admin Review by beekeeper ${bkId}`,
         actorRole: 'BEEKEEPER',
       });
 
@@ -171,15 +190,99 @@ export const AddHiveModal: React.FC<AddHiveModalProps> = ({ isOpen, onClose, onS
     }
   };
 
-  if (createdHive) {
+  if (createdHive && showSticker) {
     return (
       <PrintableHiveSticker
         hive={createdHive}
         onClose={() => {
+          setShowSticker(false);
           setCreatedHive(null);
           onClose();
         }}
       />
+    );
+  }
+
+  if (createdHive) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in">
+        <div className="relative flex flex-col w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-amber-500/30 shadow-2xl p-6 text-center space-y-5">
+          <div className="w-16 h-16 rounded-3xl bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto border border-amber-500/20 shadow-inner">
+            <ShieldCheck className="w-9 h-9" />
+          </div>
+
+          <div className="space-y-1.5">
+            <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+              Stage 1 Submitted
+            </span>
+            <h3 className="text-xl font-black text-slate-900 dark:text-white pt-1">
+              Hive Registration Submitted!
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Assigned Atomic ID: <strong className="font-mono text-amber-600 dark:text-amber-400">{createdHive.hiveId}</strong>
+            </p>
+          </div>
+
+          {/* 3-Step Verification Pipeline Stepper */}
+          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 text-left space-y-3">
+            <h4 className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+              Verification Pipeline
+            </h4>
+            
+            <div className="space-y-2.5 text-xs">
+              <div className="flex items-start gap-3">
+                <div className="w-5 h-5 rounded-full bg-amber-500 text-slate-950 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5 animate-pulse">
+                  1
+                </div>
+                <div>
+                  <div className="font-bold text-amber-600 dark:text-amber-400">Admin Initial Review (Current)</div>
+                  <div className="text-[11px] text-slate-500">Apiary location, colony type, and documentation audit.</div>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 opacity-60">
+                <div className="w-5 h-5 rounded-full bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
+                  2
+                </div>
+                <div>
+                  <div className="font-bold text-slate-700 dark:text-slate-300">Accredited Lab Health Verification</div>
+                  <div className="text-[11px] text-slate-500">Colony health check, biosecurity & disease inspection.</div>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 opacity-60">
+                <div className="w-5 h-5 rounded-full bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
+                  3
+                </div>
+                <div>
+                  <div className="font-bold text-slate-700 dark:text-slate-300">Admin Final Activation</div>
+                  <div className="text-[11px] text-slate-500">Hive status turns Active for live IoT pairing and batch harvests.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowSticker(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition cursor-pointer"
+            >
+              <span>Print Hive Sticker</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setCreatedHive(null);
+                onClose();
+              }}
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-md transition cursor-pointer"
+            >
+              <span>Back to My Hives</span>
+            </button>
+          </div>
+        </div>
+      </div>
     );
   }
 

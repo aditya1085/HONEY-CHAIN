@@ -8,7 +8,7 @@ import {
   createUserWithEmailAndPassword,
   signOut as fbSignOut,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 import { handleFirestoreError, OperationType } from '../firebase/errors';
 import { UserProfile, UserRole, BeekeeperProfile } from '../types';
@@ -35,7 +35,7 @@ interface AuthContextType {
   activeRole: UserRole;
   setActiveRole: (role: UserRole) => void;
   signInWithGoogle: () => Promise<void>;
-  signInWithEmail: (email: string, pass: string) => Promise<void>;
+  signInWithEmail: (email: string, pass: string, intendedRole?: UserRole) => Promise<void>;
   signUpWithEmail: (
     email: string,
     pass: string,
@@ -106,11 +106,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Fetch or sync user document
   const syncUserData = async (fbUser: FirebaseUser) => {
     try {
+      const cleanEmail = (fbUser.email || '').toLowerCase().trim();
       const userRef = doc(db, 'users', fbUser.uid);
       const userSnap = await getDoc(userRef);
 
-      const isSuperAdmin = checkIsSuperAdmin(fbUser.email);
+      const isSuperAdmin = checkIsSuperAdmin(cleanEmail);
+      const isLabEmail = PRE_PROVISIONED_LAB_EMAILS.some((e) => e.toLowerCase() === cleanEmail);
+
+      const pendingSignupRole = (typeof window !== 'undefined' ? (window as any).__hc_pending_role : null) ||
+        sessionStorage.getItem('hc_pending_signup_role') as UserRole | null;
+      const pendingSigninRole = sessionStorage.getItem('hc_pending_signin_role') as UserRole | null;
+      const savedUserRole = (
+        localStorage.getItem(`hc_user_role_${fbUser.uid}`) ||
+        localStorage.getItem(`hc_user_role_${cleanEmail}`) ||
+        localStorage.getItem('hc_last_signup_role')
+      ) as UserRole | null;
+
+      // Check beekeeper record existence first
+      let hasBeekeeperDoc = false;
+      const bkRef = doc(db, 'beekeepers', fbUser.uid);
+      try {
+        const bkSnap = await getDoc(bkRef);
+        if (bkSnap.exists()) {
+          hasBeekeeperDoc = true;
+          setBeekeeperProfile(bkSnap.data() as BeekeeperProfile);
+        } else {
+          // Also check by userId query in beekeepers collection
+          const qBk = query(collection(db, 'beekeepers'), where('userId', '==', fbUser.uid), limit(1));
+          const qSnap = await getDocs(qBk);
+          if (!qSnap.empty) {
+            hasBeekeeperDoc = true;
+            setBeekeeperProfile(qSnap.docs[0].data() as BeekeeperProfile);
+          }
+        }
+      } catch (bkErr) {
+        console.warn('Initial beekeeper doc check notice:', bkErr);
+      }
+
       let currentRole: UserRole = 'CONSUMER';
+      if (isSuperAdmin) {
+        currentRole = 'ADMIN';
+      } else if (isLabEmail) {
+        currentRole = 'LAB';
+      } else if (hasBeekeeperDoc) {
+        currentRole = 'BEEKEEPER';
+      } else if (userSnap.exists() && userSnap.data().role) {
+        currentRole = userSnap.data().role;
+      } else if (pendingSignupRole) {
+        currentRole = pendingSignupRole;
+      } else if (pendingSigninRole) {
+        currentRole = pendingSigninRole;
+      } else if (savedUserRole) {
+        currentRole = savedUserRole;
+      }
 
       if (userSnap.exists()) {
         const data = userSnap.data() as UserProfile;
@@ -123,13 +171,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             createdAt: new Date().toISOString(),
           }, { merge: true });
           data.role = 'ADMIN';
+        } else if (currentRole === 'BEEKEEPER' && data.role !== 'BEEKEEPER' && data.role !== 'ADMIN') {
+          // Keep Firestore user doc in sync with Beekeeper role
+          try {
+            await updateDoc(userRef, { role: 'BEEKEEPER', updatedAt: new Date().toISOString() });
+          } catch {}
+          data.role = 'BEEKEEPER';
+        } else if (!isSuperAdmin && !isLabEmail && !hasBeekeeperDoc && data.role) {
+          currentRole = data.role;
         }
+
         setUserProfile(data);
-        currentRole = data.role || 'CONSUMER';
         setActiveRole(currentRole);
+        try {
+          localStorage.setItem(`hc_user_role_${fbUser.uid}`, currentRole);
+          localStorage.setItem(`hc_user_role_${cleanEmail}`, currentRole);
+          localStorage.setItem('hc_role', currentRole);
+        } catch {}
       } else {
         // Create new user record
-        const initialRole: UserRole = isSuperAdmin ? 'ADMIN' : 'CONSUMER';
+        const initialRole: UserRole = currentRole;
         const newProfile: UserProfile = {
           id: fbUser.uid,
           email: fbUser.email || '',
@@ -147,18 +208,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
         }
         setUserProfile(newProfile);
-        currentRole = initialRole;
-        setActiveRole(currentRole);
+        setActiveRole(initialRole);
+        try {
+          localStorage.setItem(`hc_user_role_${fbUser.uid}`, initialRole);
+          localStorage.setItem(`hc_user_role_${cleanEmail}`, initialRole);
+          localStorage.setItem('hc_role', initialRole);
+        } catch {}
       }
 
       // Real-time listener for beekeeper profile
       cleanupBkListener();
-      const bkRef = doc(db, 'beekeepers', fbUser.uid);
       bkUnsubRef.current = onSnapshot(bkRef, (bkSnap) => {
         if (bkSnap.exists()) {
-          setBeekeeperProfile(bkSnap.data() as BeekeeperProfile);
+          const bkData = bkSnap.data() as BeekeeperProfile;
+          setBeekeeperProfile(bkData);
+          // When a beekeeper profile is found, automatically lock to BEEKEEPER role if not ADMIN/LAB
+          setActiveRole((prev) => {
+            if (prev === 'ADMIN' || prev === 'LAB') return prev;
+            return 'BEEKEEPER';
+          });
+          setUserProfile((prev) => {
+            if (!prev) return prev;
+            if (prev.role === 'ADMIN' || prev.role === 'LAB') return prev;
+            return {
+              ...prev,
+              role: 'BEEKEEPER',
+              beekeeperId: bkData.beekeeperId || prev.beekeeperId,
+            };
+          });
+          try {
+            localStorage.setItem(`hc_user_role_${fbUser.uid}`, 'BEEKEEPER');
+            localStorage.setItem(`hc_user_role_${cleanEmail}`, 'BEEKEEPER');
+            localStorage.setItem('hc_role', 'BEEKEEPER');
+          } catch {}
         } else {
-          setBeekeeperProfile(null);
+          setBeekeeperProfile((current) => current);
         }
       }, (err) => {
         console.warn('Beekeeper profile snapshot notice:', err);
@@ -167,7 +251,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Firestore user doc read notice (using verified auth role):', err);
       const isSuper = checkIsSuperAdmin(fbUser.email);
       const isLab = PRE_PROVISIONED_LAB_EMAILS.some((e) => e.toLowerCase() === fbUser.email?.toLowerCase());
-      const isBk = (fbUser.email || '').toLowerCase().includes('beekeeper');
+      const savedUserRole = (
+        localStorage.getItem(`hc_user_role_${fbUser.uid}`) ||
+        localStorage.getItem(`hc_user_role_${(fbUser.email || '').toLowerCase()}`) ||
+        localStorage.getItem('hc_last_signup_role')
+      ) as UserRole | null;
+      const isBk = (fbUser.email || '').toLowerCase().includes('beekeeper') || savedUserRole === 'BEEKEEPER';
       const resolvedRole: UserRole = isSuper ? 'ADMIN' : isLab ? 'LAB' : isBk ? 'BEEKEEPER' : 'CONSUMER';
 
       const fallbackProfile: UserProfile = {
@@ -244,15 +333,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signInWithEmail = async (email: string, pass: string) => {
+  const signInWithEmail = async (email: string, pass: string, intendedRole?: UserRole) => {
     const cleanEmail = email.trim().toLowerCase();
+    if (intendedRole) {
+      try {
+        sessionStorage.setItem('hc_pending_signin_role', intendedRole);
+        localStorage.setItem(`hc_user_role_${cleanEmail}`, intendedRole);
+        localStorage.setItem('hc_last_signup_role', intendedRole);
+      } catch {}
+    }
     const res = await signInWithEmailAndPassword(auth, cleanEmail, pass);
     try {
       await logActivity({
         action: 'USER_LOGIN_EMAIL',
         entityType: 'SYSTEM',
         entityId: res.user.uid,
-        details: `User signed in with Email (${res.user.email})`,
+        details: `User signed in with Email (${res.user.email}) as ${intendedRole || 'user'}`,
       });
     } catch {}
   };
@@ -290,6 +386,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       assignedRole = 'CONSUMER';
     }
 
+    // Set pending role before createUserWithEmailAndPassword so onAuthStateChanged knows the assigned role immediately
+    try {
+      if (typeof window !== 'undefined') {
+        (window as any).__hc_pending_role = assignedRole;
+      }
+      sessionStorage.setItem('hc_pending_signup_role', assignedRole);
+      localStorage.setItem(`hc_user_role_${cleanEmail}`, assignedRole);
+      localStorage.setItem('hc_last_signup_role', assignedRole);
+      localStorage.setItem('hc_role', assignedRole);
+    } catch {}
+
     const res = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
     const nowIso = new Date().toISOString();
 
@@ -318,6 +425,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setUserProfile(profile);
     setActiveRole(assignedRole);
+    try {
+      localStorage.setItem(`hc_user_role_${res.user.uid}`, assignedRole);
+      localStorage.setItem('hc_role', assignedRole);
+    } catch {}
 
     // If registering as a Beekeeper: create initial registration with status: 'pending' (NO auto-approval, NO Beekeeper ID)
     if (assignedRole === 'BEEKEEPER') {

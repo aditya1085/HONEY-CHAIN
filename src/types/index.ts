@@ -54,6 +54,13 @@ export interface BeekeeperProfile {
   updatedAt: string;
 }
 
+export type HiveApprovalStage =
+  | 'STAGE_1_ADMIN_REVIEW'       // "Pending Admin Review"
+  | 'STAGE_2_LAB_VERIFICATION'   // "Pending Lab Health Verification"
+  | 'STAGE_3_ADMIN_FINAL'        // "Pending Admin Final Review"
+  | 'COMPLETED'                  // "Active"
+  | 'REJECTED';                  // "Rejected"
+
 export interface HiveRecord {
   id: string;
   hiveId: string; // e.g. HC-UP-B045-H01
@@ -73,6 +80,26 @@ export interface HiveRecord {
   expectedProduction: number;
   status: HiveStatus;
   approvalStatus?: 'pending' | 'approved' | 'rejected';
+  approvalStage?: HiveApprovalStage;
+  // Stage 1 Admin Review
+  adminStage1ApprovedBy?: string;
+  adminStage1ApprovedAt?: string;
+  adminStage1Notes?: string;
+  // Stage 2 Accredited Lab Health Verification
+  labVerdict?: 'HEALTHY' | 'UNHEALTHY';
+  labVerdictNotes?: string;
+  labVerifiedBy?: string;
+  labVerifiedAt?: string;
+  labId?: string;
+  // Stage 2 Admin Final Decision
+  finalApprovedBy?: string;
+  finalApprovedAt?: string;
+  finalDecisionNotes?: string;
+  // Rejection tracking
+  rejectionReason?: string;
+  rejectedBy?: string;
+  rejectedAt?: string;
+  rejectionStage?: 'STAGE_1_ADMIN' | 'STAGE_2_LAB' | 'STAGE_2_ADMIN_FINAL';
   iotDeviceId?: string;
   notes?: string;
   isSample?: boolean;

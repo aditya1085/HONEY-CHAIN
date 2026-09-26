@@ -105,15 +105,57 @@ export const MyHivesView: React.FC = () => {
 
   const filtered = hives.filter((h) => {
     const matchesColony = filterColony === 'all' || h.colonyType === filterColony;
+    const s = searchTerm.toLowerCase();
     const matchesSearch =
-      h.hiveId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      h.area.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      h.colonyType.toLowerCase().includes(searchTerm.toLowerCase());
+      (h.hiveId || '').toLowerCase().includes(s) ||
+      (h.area || '').toLowerCase().includes(s) ||
+      (h.colonyType || '').toLowerCase().includes(s);
     return matchesColony && matchesSearch;
   });
 
   const totalYield = hives.reduce((sum, h) => sum + (h.expectedProduction || 0), 0);
+  const activeHivesCount = hives.filter((h) => h.status === 'active' && h.approvalStatus !== 'rejected').length;
   const iotPairedCount = hives.filter((h) => Boolean(h.iotDeviceId)).length;
+
+  const renderHiveBadge = (hive: HiveRecord) => {
+    if (hive.approvalStatus === 'rejected') {
+      return (
+        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300 border border-red-500/30">
+          REJECTED
+        </span>
+      );
+    }
+    if (hive.status === 'active' || hive.approvalStage === 'COMPLETED' || (hive.approvalStatus === 'approved' && !hive.approvalStage)) {
+      return (
+        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+          ACTIVE
+        </span>
+      );
+    }
+    if (hive.approvalStage === 'STAGE_2_LAB_VERIFICATION') {
+      return (
+        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-500/30 flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+          STAGE 2: LAB VERIFICATION
+        </span>
+      );
+    }
+    if (hive.approvalStage === 'STAGE_3_ADMIN_FINAL') {
+      return (
+        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-500/30 flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+          STAGE 2 FINAL: ADMIN REVIEW
+        </span>
+      );
+    }
+    return (
+      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-500/30 flex items-center gap-1">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+        STAGE 1: ADMIN REVIEW
+      </span>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -234,9 +276,7 @@ export const MyHivesView: React.FC = () => {
                   <span className="font-mono text-base font-black text-amber-600 dark:text-amber-400">
                     {hive.hiveId}
                   </span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                    {hive.status.toUpperCase()}
-                  </span>
+                  {renderHiveBadge(hive)}
                 </div>
 
                 <div>
@@ -259,22 +299,56 @@ export const MyHivesView: React.FC = () => {
                           Node: {hive.iotDeviceId}
                         </span>
                       ) : (
-                        <span className="text-slate-400">No IoT Node Paired</span>
+                        <span className="text-slate-400">
+                          {hive.status === 'active' ? 'No IoT Node Paired' : 'Pending Verification'}
+                        </span>
                       )}
                     </span>
                   </div>
 
-                  {hive.iotDeviceId ? (
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="Online" />
+                  {hive.status === 'active' ? (
+                    hive.iotDeviceId ? (
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="Online" />
+                    ) : (
+                      <button
+                        onClick={() => setIsPairOpen(true)}
+                        className="text-amber-600 dark:text-amber-400 font-bold hover:underline text-[10px]"
+                      >
+                        + Pair
+                      </button>
+                    )
                   ) : (
-                    <button
-                      onClick={() => setIsPairOpen(true)}
-                      className="text-amber-600 dark:text-amber-400 font-bold hover:underline text-[10px]"
-                    >
-                      + Pair
-                    </button>
+                    <span className="text-[10px] text-slate-400 font-medium italic">
+                      Live after Stage 2
+                    </span>
                   )}
                 </div>
+
+                {/* Workflow guidance if pending or rejected */}
+                {hive.approvalStatus === 'rejected' && (
+                  <div className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/40 text-[11px] text-red-700 dark:text-red-300 border border-red-500/20">
+                    <span className="font-bold block">Rejection Reason:</span>
+                    <span>{hive.rejectionReason || 'Inspection criteria not met.'}</span>
+                  </div>
+                )}
+
+                {hive.status !== 'active' && hive.approvalStatus !== 'rejected' && (
+                  <div className="p-2.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 text-[11px] border border-amber-500/20 space-y-1">
+                    <div className="font-bold text-amber-800 dark:text-amber-300 flex items-center justify-between">
+                      <span>Approval Pipeline</span>
+                      <span className="font-mono text-[10px]">
+                        {hive.approvalStage === 'STAGE_2_LAB_VERIFICATION' ? 'Step 2/3' : hive.approvalStage === 'STAGE_3_ADMIN_FINAL' ? 'Step 2.5/3' : 'Step 1/3'}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                      {hive.approvalStage === 'STAGE_2_LAB_VERIFICATION'
+                        ? 'Admin Stage 1 passed. Accredited Lab is performing biosecurity & health review.'
+                        : hive.approvalStage === 'STAGE_3_ADMIN_FINAL'
+                        ? `Lab health check completed (${hive.labVerdict}). Awaiting Admin final activation.`
+                        : 'Submitted for Stage 1 Admin apiary and documentation review.'}
+                    </p>
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
                   <span>Architecture: {hive.hiveType}</span>

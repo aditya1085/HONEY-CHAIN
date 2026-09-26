@@ -144,13 +144,19 @@ export const BeekeeperRegistration: React.FC<BeekeeperRegistrationProps> = ({ on
         actorRole: 'BEEKEEPER',
       });
 
+      try {
+        localStorage.setItem(`hc_user_role_${currentUser.uid}`, 'BEEKEEPER');
+        localStorage.setItem('hc_role', 'BEEKEEPER');
+      } catch {}
+
       await refreshBeekeeperProfile();
       setActiveRole('BEEKEEPER');
       setIsSuccess(true);
       if (onSuccess) onSuccess();
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Registration failed:', err);
-      handleFirestoreError(err, OperationType.CREATE, `beekeepers/${currentUser?.uid}`);
+      const msg = err instanceof Error ? err.message : 'Registration failed. Please check your network and try again.';
+      setErrorMsg(msg);
     } finally {
       setSubmitting(false);
     }

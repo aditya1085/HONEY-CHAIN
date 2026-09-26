@@ -50,6 +50,7 @@ import { Sparkles, CheckCircle, QrCode, AlertCircle, X, ShieldAlert, Cpu } from 
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from './firebase/config';
 import { HiveRecord, CartItem, HoneyListing } from './types';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 const MainContent: React.FC = () => {
   const { currentUser, beekeeperProfile, activeRole } = useAuth();
@@ -355,6 +356,7 @@ const MainContent: React.FC = () => {
           </div>
         )}
 
+        <ErrorBoundary fallbackTitle="View Display Notice">
         {/* Phase 4 Marketplace View */}
         {currentTab === 'marketplace' && (
           <MarketplaceView
@@ -544,6 +546,7 @@ const MainContent: React.FC = () => {
             initialTab="charts"
           />
         )}
+        </ErrorBoundary>
           </>
         )}
       </main>
