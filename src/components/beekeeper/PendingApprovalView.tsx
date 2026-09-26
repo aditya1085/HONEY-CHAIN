@@ -124,23 +124,36 @@ export const PendingApprovalView: React.FC<PendingApprovalViewProps> = ({
       </div>
 
       {/* Details summary */}
-      <div className="grid grid-cols-2 gap-2 p-3.5 rounded-xl bg-amber-50/60 dark:bg-slate-800/60 text-xs border border-amber-500/20">
+      <div className="grid grid-cols-2 gap-3 p-4 rounded-2xl bg-amber-50/60 dark:bg-slate-800/60 text-xs border border-amber-500/20">
         <div>
-          <span className="text-slate-500 dark:text-slate-400">Name:</span>
+          <span className="text-slate-500 dark:text-slate-400">Applicant:</span>
           <p className="font-semibold text-slate-800 dark:text-slate-200">{beekeeper.name}</p>
         </div>
         <div>
-          <span className="text-slate-500 dark:text-slate-400">Madhukranti ID:</span>
-          <p className="font-mono font-semibold text-amber-600 dark:text-amber-400">{beekeeper.madhukrantiId}</p>
+          <span className="text-slate-500 dark:text-slate-400">Contact Number:</span>
+          <p className="font-semibold text-slate-800 dark:text-slate-200">{beekeeper.phone || 'N/A'}</p>
         </div>
         <div>
-          <span className="text-slate-500 dark:text-slate-400">State / District:</span>
-          <p className="font-semibold text-slate-800 dark:text-slate-200">{beekeeper.state}, {beekeeper.district}</p>
+          <span className="text-slate-500 dark:text-slate-400">Madhukranti Portal ID:</span>
+          <p className="font-mono font-bold text-amber-600 dark:text-amber-400">{beekeeper.madhukrantiId}</p>
         </div>
         <div>
           <span className="text-slate-500 dark:text-slate-400">Aadhaar (Last 4):</span>
-          <p className="font-mono font-semibold text-slate-800 dark:text-slate-200">XXXX-XXXX-{beekeeper.aadhaarLast4}</p>
+          <p className="font-mono font-semibold text-slate-800 dark:text-slate-200">•••• •••• {beekeeper.aadhaarLast4}</p>
         </div>
+        <div>
+          <span className="text-slate-500 dark:text-slate-400">Location:</span>
+          <p className="font-semibold text-slate-800 dark:text-slate-200">{beekeeper.district}, {beekeeper.state}</p>
+          <p className="font-mono text-[10px] text-slate-400">GPS: {beekeeper.lat?.toFixed(4)}, {beekeeper.lng?.toFixed(4)}</p>
+        </div>
+        <div>
+          <span className="text-slate-500 dark:text-slate-400">Total Hives Planned:</span>
+          <p className="font-bold text-slate-900 dark:text-white">{beekeeper.totalHivesPlanned || beekeeper.totalHivesCount || 10} boxes</p>
+        </div>
+      </div>
+
+      <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-xl text-center text-xs text-slate-500">
+        Status updates automatically in real-time when the administrator reviews your application in the Approval Queue.
       </div>
     </div>
   );

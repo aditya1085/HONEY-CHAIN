@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
-import { ShieldCheck, Check, X, AlertTriangle, Search, Filter, ExternalLink, MapPin, Eye, CheckSquare, RefreshCw } from 'lucide-react';
+import { collection, onSnapshot, doc, updateDoc, setDoc } from 'firebase/firestore';
+import { ShieldCheck, Check, X, AlertTriangle, Search, Filter, ExternalLink, MapPin, Eye, CheckSquare, RefreshCw, Layers } from 'lucide-react';
 import { db } from '../../firebase/config';
 import { handleFirestoreError, OperationType } from '../../firebase/errors';
 import { BeekeeperProfile, BeekeeperStatus } from '../../types';
@@ -35,19 +35,26 @@ export const AdminApprovalQueue: React.FC = () => {
     const unsubscribe = onSnapshot(
       collection(db, 'beekeepers'),
       (snapshot) => {
-        const list: BeekeeperProfile[] = [];
+        const liveList: BeekeeperProfile[] = [];
         snapshot.forEach((d) => {
-          list.push(d.data() as BeekeeperProfile);
+          liveList.push(d.data() as BeekeeperProfile);
         });
-        if (list.length > 0) {
-          // Sort: pending first, then by date desc
-          list.sort((a, b) => {
-            if (a.status === 'pending' && b.status !== 'pending') return -1;
-            if (b.status === 'pending' && a.status !== 'pending') return 1;
-            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-          });
-          setBeekeepers(list);
-        }
+
+        // Merge with master dataset: live Firestore docs take precedence
+        const liveIds = new Set(liveList.map((b) => b.id));
+        const combined = [
+          ...liveList,
+          ...SAMPLE_DATA_MASTER.beekeepers.filter((b) => !liveIds.has(b.id)),
+        ];
+
+        // Sort: pending first, then by date desc
+        combined.sort((a, b) => {
+          if (a.status === 'pending' && b.status !== 'pending') return -1;
+          if (b.status === 'pending' && a.status !== 'pending') return 1;
+          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+        });
+
+        setBeekeepers(combined);
         setLoading(false);
       },
       (err) => {
@@ -79,6 +86,7 @@ export const AdminApprovalQueue: React.FC = () => {
     try {
       // 1. Transaction-safe atomic Beekeeper ID generation (e.g. B001, B045)
       const { beekeeperId, seq } = await generateBeekeeperId();
+      const nowIso = new Date().toISOString();
 
       // 2. Update beekeeper profile
       const bkRef = doc(db, 'beekeepers', selectedBeekeeper.id);
@@ -87,18 +95,38 @@ export const AdminApprovalQueue: React.FC = () => {
         beekeeperId,
         beekeeperSeq: seq,
         approvedBy: currentUser.uid,
-        approvedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        approvedAt: nowIso,
+        updatedAt: nowIso,
       });
 
       // 3. Link beekeeperId to the user record
-      const userRef = doc(db, 'users', selectedBeekeeper.userId);
-      await updateDoc(userRef, {
-        beekeeperId,
-        updatedAt: new Date().toISOString(),
-      });
+      if (selectedBeekeeper.userId) {
+        try {
+          const userRef = doc(db, 'users', selectedBeekeeper.userId);
+          await updateDoc(userRef, {
+            beekeeperId,
+            updatedAt: nowIso,
+          });
+        } catch (uErr) {
+          console.warn('User doc update notice:', uErr);
+        }
 
-      // 4. Record audit activity
+        // 4. Create in-app notification for Beekeeper
+        try {
+          const notifId = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+          await setDoc(doc(db, 'notifications', notifId), {
+            id: notifId,
+            userId: selectedBeekeeper.userId,
+            title: '🎉 Apiary Registration Approved!',
+            message: `Your Honey Chain Beekeeper credentials have been approved by the Administrator. Your Official Beekeeper ID is ${beekeeperId}. You can now register hives and log honey harvests.`,
+            type: 'SUCCESS',
+            read: false,
+            createdAt: nowIso,
+          });
+        } catch {}
+      }
+
+      // 5. Record audit activity
       await logActivity({
         action: 'BEEKEEPER_APPROVED',
         entityType: 'BEEKEEPER',
@@ -127,12 +155,28 @@ export const AdminApprovalQueue: React.FC = () => {
     setActionError(null);
 
     try {
+      const nowIso = new Date().toISOString();
       const bkRef = doc(db, 'beekeepers', selectedBeekeeper.id);
       await updateDoc(bkRef, {
         status: 'rejected',
         rejectionReason: rejectionReason.trim(),
-        updatedAt: new Date().toISOString(),
+        updatedAt: nowIso,
       });
+
+      if (selectedBeekeeper.userId) {
+        try {
+          const notifId = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+          await setDoc(doc(db, 'notifications', notifId), {
+            id: notifId,
+            userId: selectedBeekeeper.userId,
+            title: 'Apiary Registration Rejected',
+            message: `Your registration was rejected. Reason: ${rejectionReason.trim()}`,
+            type: 'ALERT',
+            read: false,
+            createdAt: nowIso,
+          });
+        } catch {}
+      }
 
       await logActivity({
         action: 'BEEKEEPER_REJECTED',
@@ -385,6 +429,21 @@ export const AdminApprovalQueue: React.FC = () => {
                     <span className="text-slate-500">Aadhaar (Last 4):</span>
                     <div className="font-mono text-slate-900 dark:text-white">
                       •••• •••• {selectedBeekeeper.aadhaarLast4}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Total Hives Planned:</span>
+                    <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1">
+                      <Layers className="w-3.5 h-3.5 text-amber-500" />
+                      <span>{selectedBeekeeper.totalHivesPlanned || selectedBeekeeper.totalHivesCount || 10} hives</span>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Current Status:</span>
+                    <div>
+                      <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 uppercase">
+                        {selectedBeekeeper.status}
+                      </span>
                     </div>
                   </div>
                 </div>

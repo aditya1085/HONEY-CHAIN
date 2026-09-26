@@ -183,6 +183,10 @@ export const LabPortal: React.FC<LabPortalProps> = ({ currentUserId, userRole })
 
   // Acknowledge receipt
   const handleAcknowledgeSample = async (sample: LabSample) => {
+    if (userRole !== 'LAB') {
+      alert('Access Denied: Only certified Laboratory Personnel (LAB role) can acknowledge sample receipt.');
+      return;
+    }
     try {
       const now = new Date().toISOString();
       await updateDoc(doc(db, 'labSamples', sample.sampleId), {
@@ -207,6 +211,11 @@ export const LabPortal: React.FC<LabPortalProps> = ({ currentUserId, userRole })
   const handleSubmitReport = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSample || !activeLab) return;
+
+    if (userRole !== 'LAB') {
+      setSubmitError('Access Denied: Only certified Laboratory Specialists (LAB role) can record test parameters. Admin cannot edit lab values.');
+      return;
+    }
 
     setSubmittingTest(true);
     setSubmitError('');
@@ -541,24 +550,36 @@ export const LabPortal: React.FC<LabPortalProps> = ({ currentUserId, userRole })
                       </td>
                       <td className="px-4 py-3.5 text-right space-x-2">
                         {s.status === 'dispatched' && (
-                          <button
-                            onClick={() => handleAcknowledgeSample(s)}
-                            className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700"
-                          >
-                            Acknowledge Receipt
-                          </button>
+                          userRole === 'LAB' ? (
+                            <button
+                              onClick={() => handleAcknowledgeSample(s)}
+                              className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700"
+                            >
+                              Acknowledge Receipt
+                            </button>
+                          ) : (
+                            <span className="text-[11px] text-zinc-400 italic">
+                              Awaiting Lab Receipt
+                            </span>
+                          )
                         )}
 
                         {s.status === 'in_testing' && (
-                          <button
-                            onClick={() => {
-                              setSelectedSample(s);
-                              setShowTestModal(true);
-                            }}
-                            className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 shadow-xs"
-                          >
-                            Enter Test Results
-                          </button>
+                          userRole === 'LAB' ? (
+                            <button
+                              onClick={() => {
+                                setSelectedSample(s);
+                                setShowTestModal(true);
+                              }}
+                              className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 shadow-xs"
+                            >
+                              Enter Test Results
+                            </button>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-1 rounded-md" title="Admin cannot edit lab values">
+                              <Lock className="w-3 h-3" /> Lab Specialists Only
+                            </span>
+                          )
                         )}
 
                         {s.status === 'completed' && report && (
@@ -796,6 +817,11 @@ export const LabPortal: React.FC<LabPortalProps> = ({ currentUserId, userRole })
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-2">
+                {userRole !== 'LAB' && (
+                  <span className="text-xs text-red-500 font-semibold mr-auto">
+                    * Admin/Auditor accounts cannot submit test results. LAB login required.
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={() => setShowTestModal(false)}
@@ -805,7 +831,7 @@ export const LabPortal: React.FC<LabPortalProps> = ({ currentUserId, userRole })
                 </button>
                 <button
                   type="submit"
-                  disabled={submittingTest}
+                  disabled={submittingTest || userRole !== 'LAB'}
                   className="rounded-xl bg-teal-600 px-5 py-2 text-sm font-bold text-white hover:bg-teal-700 shadow-md shadow-teal-600/20 disabled:opacity-50"
                 >
                   {submittingTest ? 'Certifying & Hashing...' : 'Certify Purity & Compute SHA-256 Hash'}

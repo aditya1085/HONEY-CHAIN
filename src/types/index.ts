@@ -43,6 +43,7 @@ export interface BeekeeperProfile {
   madhukrantiId: string;
   yearsOfExperience?: number;
   totalHivesCount?: number;
+  totalHivesPlanned?: number;
   trustScore?: number;
   status: BeekeeperStatus;
   rejectionReason?: string;

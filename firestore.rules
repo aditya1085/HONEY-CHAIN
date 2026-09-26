@@ -21,11 +21,15 @@ service cloud.firestore {
 
     function isSuperAdminEmail() {
       return isSignedIn() && (
+        request.auth.token.email == 'gargashu138@gmail.com' ||
         request.auth.token.email == 'gargashu148@gmail.com' ||
         request.auth.token.email == 'commercial1085@gmail.com' ||
         request.auth.token.email == 'adityatripathi8989@gmail.com' ||
         request.auth.token.email == 'adityatripathi1085@gmail.com' ||
-        request.auth.token.email == 'adityatripathi240815@acropolis.in'
+        request.auth.token.email == 'adityatripathi240815@acropolis.in' ||
+        request.auth.token.email == 'admin.honeychain@gmail.com' ||
+        request.auth.token.email == 'admin@honeychain.in' ||
+        request.auth.token.email == 'admin.demo@honeychain.in'
       );
     }
 

@@ -13,12 +13,14 @@ import {
   Battery,
   Clock,
   Printer,
+  Activity,
 } from 'lucide-react';
 import { db } from '../../firebase/config';
 import { handleFirestoreError, OperationType } from '../../firebase/errors';
 import { HiveRecord, IoTDevice } from '../../types';
 import { logActivity } from '../../services/activityLogger';
 import { PrintableHiveSticker } from '../hives/PrintableHiveSticker';
+import { IoTSimulatorModal } from '../iot/IoTSimulatorModal';
 import { IndiaHivesMap } from '../common/IndiaHivesMap';
 import { useLanguage } from '../../context/LanguageContext';
 import { SAMPLE_DATA_MASTER } from '../../services/sampleDataMaster';
@@ -34,6 +36,7 @@ export const AdminHivesManagement: React.FC = () => {
   const [isSweeping, setIsSweeping] = useState(false);
   const [sweepResult, setSweepResult] = useState<string | null>(null);
   const [stickerHive, setStickerHive] = useState<HiveRecord | null>(null);
+  const [simulatingHive, setSimulatingHive] = useState<HiveRecord | null>(null);
 
   // Real-time Hives Listener
   useEffect(() => {
@@ -255,6 +258,14 @@ export const AdminHivesManagement: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 text-right space-x-2">
                       <button
+                        onClick={() => setSimulatingHive(hive)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 text-[11px] font-semibold border border-amber-500/20"
+                        title="Simulate IoT sensor telemetry for this hive"
+                      >
+                        <Activity className="w-3 h-3 text-amber-500" /> Simulate IoT
+                      </button>
+
+                      <button
                         onClick={() => setStickerHive(hive)}
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-semibold"
                       >
@@ -345,6 +356,16 @@ export const AdminHivesManagement: React.FC = () => {
         <PrintableHiveSticker
           hive={stickerHive}
           onClose={() => setStickerHive(null)}
+        />
+      )}
+
+      {/* IoT Sensor Simulator Modal */}
+      {simulatingHive && (
+        <IoTSimulatorModal
+          isOpen={Boolean(simulatingHive)}
+          onClose={() => setSimulatingHive(null)}
+          hiveId={simulatingHive.hiveId}
+          colonyType={simulatingHive.colonyType}
         />
       )}
     </div>

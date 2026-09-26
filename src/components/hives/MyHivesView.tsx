@@ -24,12 +24,18 @@ import { AddHiveModal } from './AddHiveModal';
 import { PrintableHiveSticker } from './PrintableHiveSticker';
 import { PairIoTDeviceModal } from './PairIoTDeviceModal';
 import { HiveDetailView } from './HiveDetailView';
+import { PendingApprovalView } from '../beekeeper/PendingApprovalView';
 
 export const MyHivesView: React.FC = () => {
   const { beekeeperProfile, currentUser } = useAuth();
   const { t } = useLanguage();
 
-  const bkId = beekeeperProfile?.beekeeperId || 'BK-1001';
+  // If beekeeper is not approved yet, display pending status view
+  if (beekeeperProfile && beekeeperProfile.status !== 'approved') {
+    return <PendingApprovalView beekeeper={beekeeperProfile} />;
+  }
+
+  const bkId = beekeeperProfile?.beekeeperId || 'B001';
 
   const [hives, setHives] = useState<HiveRecord[]>(() => {
     let local: HiveRecord[] = [];
@@ -38,7 +44,7 @@ export const MyHivesView: React.FC = () => {
     } catch {}
     const list = SAMPLE_DATA_MASTER.hives.filter((h) => h.beekeeperId === bkId);
     const combined = [...local, ...list.filter((h) => !local.some((l) => l.hiveId === h.hiveId))];
-    return combined.length > 0 ? combined : SAMPLE_DATA_MASTER.hives.slice(0, 3);
+    return combined;
   });
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -305,6 +311,7 @@ export const MyHivesView: React.FC = () => {
         isOpen={isAddOpen}
         onClose={() => setIsAddOpen(false)}
         onSuccess={(newHive) => {
+          setHives((prev) => [newHive, ...prev.filter((h) => h.hiveId !== newHive.hiveId)]);
           setIsAddOpen(false);
         }}
       />

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { X, Mail, Lock, User, AlertCircle, Sparkles, ExternalLink, ShieldCheck } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { X, Mail, Lock, User, AlertCircle, Sparkles, ExternalLink, ShieldCheck, MapPin, Navigation, Phone, Home, Hash, Layers } from 'lucide-react';
+import { useAuth, BeekeeperSignupData } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { UserRole } from '../../types';
 
@@ -8,6 +8,23 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialMode?: 'signin' | 'signup';
+}
+
+const INDIAN_STATES = [
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+  'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
+  'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram',
+  'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
+  'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+];
+
+// Salted SHA-256 for Aadhaar compliance
+async function computeAadhaarHash(last4: string, phoneNum: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(`HC_SALT_${last4}_${phoneNum}`);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
@@ -23,11 +40,49 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [role, setRole] = useState<UserRole>('BEEKEEPER');
+
+  // Beekeeper Profile Fields
+  const [phone, setPhone] = useState('');
+  const [stateName, setStateName] = useState('Uttar Pradesh');
+  const [district, setDistrict] = useState('');
+  const [address, setAddress] = useState('');
+  const [lat, setLat] = useState<number>(26.8467);
+  const [lng, setLng] = useState<number>(80.9462);
+  const [aadhaarLast4, setAadhaarLast4] = useState('');
+  const [madhukrantiId, setMadhukrantiId] = useState('');
+  const [totalHivesPlanned, setTotalHivesPlanned] = useState<number>(10);
+  const [detectingGps, setDetectingGps] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isOperationNotAllowed, setIsOperationNotAllowed] = useState(false);
 
   if (!isOpen) return null;
+
+  const handleAutoDetectGps = () => {
+    if (!navigator.geolocation) {
+      setErrorMsg('Geolocation is not supported by your browser.');
+      return;
+    }
+    setDetectingGps(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (pos?.coords?.latitude != null && !isNaN(pos.coords.latitude)) {
+          setLat(Number(pos.coords.latitude.toFixed(6)));
+        }
+        if (pos?.coords?.longitude != null && !isNaN(pos.coords.longitude)) {
+          setLng(Number(pos.coords.longitude.toFixed(6)));
+        }
+        setDetectingGps(false);
+      },
+      (err) => {
+        console.warn('GPS detection failed:', err);
+        setErrorMsg('Unable to retrieve location automatically. Coordinates set to default.');
+        setDetectingGps(false);
+      },
+      { timeout: 10000, enableHighAccuracy: true }
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +94,42 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       if (mode === 'signin') {
         await signInWithEmail(email, password);
       } else {
-        await signUpWithEmail(email, password, displayName, role);
+        let bkDetails: BeekeeperSignupData | undefined = undefined;
+
+        if (role === 'BEEKEEPER') {
+          if (!phone.trim()) {
+            throw new Error('Contact number is required for beekeeper registration.');
+          }
+          if (!district.trim()) {
+            throw new Error('District is required.');
+          }
+          if (!address.trim()) {
+            throw new Error('Full apiary address is required.');
+          }
+          if (!/^\d{4}$/.test(aadhaarLast4.trim())) {
+            throw new Error('Aadhaar must be exactly the last 4 digits.');
+          }
+          if (!madhukrantiId.trim()) {
+            throw new Error('Madhukranti Portal Registration ID is required for verification.');
+          }
+
+          const aadhaarHash = await computeAadhaarHash(aadhaarLast4.trim(), phone.trim());
+
+          bkDetails = {
+            phone: phone.trim(),
+            state: stateName,
+            district: district.trim(),
+            address: address.trim(),
+            lat,
+            lng,
+            aadhaarLast4: aadhaarLast4.trim(),
+            aadhaarHash,
+            madhukrantiId: madhukrantiId.trim(),
+            totalHivesPlanned: Number(totalHivesPlanned) || 10,
+          };
+        }
+
+        await signUpWithEmail(email, password, displayName, role, bkDetails);
       }
       onClose();
     } catch (err: unknown) {
@@ -246,6 +336,154 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     * {t('auth.adminLabNotice') || 'Admin & Accredited Lab accounts are provisioned exclusively by platform administration.'}
                   </p>
                 </div>
+
+                {/* Additional Beekeeper Profile Fields Required by Section 3 */}
+                {role === 'BEEKEEPER' && (
+                  <div className="p-3.5 bg-amber-50/60 dark:bg-amber-950/20 border border-amber-500/30 rounded-2xl space-y-2.5 text-xs">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-800 dark:text-amber-300 text-[11px] uppercase tracking-wider">
+                      <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Apiary Credentials (Govt / Madhukranti)</span>
+                    </div>
+
+                    {/* Contact Number */}
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-700 dark:text-slate-300 mb-0.5">
+                        Contact Number *
+                      </label>
+                      <div className="relative">
+                        <Phone className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="tel"
+                          required
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          placeholder="+91 98765 43210"
+                          className="w-full pl-8 pr-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    {/* State & District */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-700 dark:text-slate-300 mb-0.5">
+                          State *
+                        </label>
+                        <select
+                          value={stateName}
+                          onChange={(e) => setStateName(e.target.value)}
+                          className="w-full px-2 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs"
+                        >
+                          {INDIAN_STATES.map((s) => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-700 dark:text-slate-300 mb-0.5">
+                          District *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={district}
+                          onChange={(e) => setDistrict(e.target.value)}
+                          placeholder="e.g. Lucknow"
+                          className="w-full px-2 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Full Apiary Address */}
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-700 dark:text-slate-300 mb-0.5">
+                        Full Apiary Address *
+                      </label>
+                      <div className="relative">
+                        <Home className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                        <textarea
+                          rows={2}
+                          required
+                          value={address}
+                          onChange={(e) => setAddress(e.target.value)}
+                          placeholder="Village, Post, Tehsil, Landmark"
+                          className="w-full pl-8 pr-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Aadhaar Last 4 & Madhukranti Portal ID */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-700 dark:text-slate-300 mb-0.5">
+                          Aadhaar Last 4 Digits *
+                        </label>
+                        <input
+                          type="text"
+                          maxLength={4}
+                          required
+                          value={aadhaarLast4}
+                          onChange={(e) => setAadhaarLast4(e.target.value.replace(/\D/g, ''))}
+                          placeholder="1234"
+                          className="w-full px-2 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-700 dark:text-slate-300 mb-0.5">
+                          Madhukranti Portal ID *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={madhukrantiId}
+                          onChange={(e) => setMadhukrantiId(e.target.value)}
+                          placeholder="NBB/UP/2026/0123"
+                          className="w-full px-2 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Total Hives Planned & GPS */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-700 dark:text-slate-300 mb-0.5">
+                          Total Hives Planned *
+                        </label>
+                        <div className="relative">
+                          <Layers className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="number"
+                            min={1}
+                            max={5000}
+                            required
+                            value={totalHivesPlanned}
+                            onChange={(e) => setTotalHivesPlanned(Number(e.target.value))}
+                            className="w-full pl-8 pr-2 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-700 dark:text-slate-300 mb-0.5">
+                          GPS Coordinates
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleAutoDetectGps}
+                          disabled={detectingGps}
+                          className="w-full py-1.5 px-2 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-900 dark:text-amber-300 text-[10px] font-bold rounded-lg flex items-center justify-center gap-1 transition"
+                        >
+                          <Navigation className={`w-3 h-3 ${detectingGps ? 'animate-spin' : ''}`} />
+                          <span>{detectingGps ? 'Locating...' : 'Use My Location'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="text-[10px] text-slate-500 font-mono text-center">
+                      GPS: {lat.toFixed(4)}, {lng.toFixed(4)}
+                    </div>
+                  </div>
+                )}
               </>
             )}
 

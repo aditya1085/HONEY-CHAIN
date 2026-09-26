@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   User as FirebaseUser,
   onAuthStateChanged,
@@ -8,11 +8,24 @@ import {
   createUserWithEmailAndPassword,
   signOut as fbSignOut,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 import { handleFirestoreError, OperationType } from '../firebase/errors';
 import { UserProfile, UserRole, BeekeeperProfile } from '../types';
 import { logActivity } from '../services/activityLogger';
+
+export interface BeekeeperSignupData {
+  phone?: string;
+  state?: string;
+  district?: string;
+  address?: string;
+  lat?: number;
+  lng?: number;
+  aadhaarLast4?: string;
+  aadhaarHash?: string;
+  madhukrantiId?: string;
+  totalHivesPlanned?: number;
+}
 
 interface AuthContextType {
   currentUser: FirebaseUser | null;
@@ -23,7 +36,13 @@ interface AuthContextType {
   setActiveRole: (role: UserRole) => void;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, pass: string) => Promise<void>;
-  signUpWithEmail: (email: string, pass: string, name: string, role: UserRole) => Promise<void>;
+  signUpWithEmail: (
+    email: string,
+    pass: string,
+    name: string,
+    role: UserRole,
+    beekeeperDetails?: BeekeeperSignupData
+  ) => Promise<void>;
   signOut: () => Promise<void>;
   bootstrapAdmin: () => Promise<void>;
   refreshBeekeeperProfile: () => Promise<void>;
@@ -47,6 +66,7 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export const SUPER_ADMIN_EMAILS = [
+  'gargashu138@gmail.com',
   'commercial1085@gmail.com',
   'adityatripathi8989@gmail.com',
   'adityatripathi1085@gmail.com',
@@ -67,33 +87,21 @@ export const checkIsSuperAdmin = (email?: string | null) => {
   return SUPER_ADMIN_EMAILS.some((e) => e.toLowerCase() === email.toLowerCase());
 };
 
-const createDemoBeekeeperProfile = (userId: string, name: string, email: string): BeekeeperProfile => ({
-  id: 'BK-1001',
-  beekeeperId: 'BK-1001',
-  userId,
-  name,
-  email,
-  phone: '+91 98765 43210',
-  state: 'Punjab',
-  district: 'Hoshiarpur',
-  address: 'Mustard Belt Apiary Zone, Dasuya Road',
-  lat: 31.5273,
-  lng: 75.9142,
-  aadhaarLast4: '4521',
-  aadhaarHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-  madhukrantiId: 'NBB/PB/2024/0981',
-  trustScore: 96,
-  status: 'approved',
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-});
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [beekeeperProfile, setBeekeeperProfile] = useState<BeekeeperProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeRole, setActiveRole] = useState<UserRole>('CONSUMER');
+  const bkUnsubRef = useRef<(() => void) | null>(null);
+
+  // Clean up any beekeeper listener
+  const cleanupBkListener = () => {
+    if (bkUnsubRef.current) {
+      bkUnsubRef.current();
+      bkUnsubRef.current = null;
+    }
+  };
 
   // Fetch or sync user document
   const syncUserData = async (fbUser: FirebaseUser) => {
@@ -143,16 +151,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setActiveRole(currentRole);
       }
 
-      // Check beekeeper profile
+      // Real-time listener for beekeeper profile
+      cleanupBkListener();
       const bkRef = doc(db, 'beekeepers', fbUser.uid);
-      const bkSnap = await getDoc(bkRef);
-      if (bkSnap.exists()) {
-        setBeekeeperProfile(bkSnap.data() as BeekeeperProfile);
-      } else if (currentRole === 'BEEKEEPER' || fbUser.email?.toLowerCase().includes('beekeeper')) {
-        setBeekeeperProfile(createDemoBeekeeperProfile(fbUser.uid, fbUser.displayName || 'Sita Ram (Beekeeper)', fbUser.email || 'beekeeper.demo@honeychain.in'));
-      } else {
-        setBeekeeperProfile(null);
-      }
+      bkUnsubRef.current = onSnapshot(bkRef, (bkSnap) => {
+        if (bkSnap.exists()) {
+          setBeekeeperProfile(bkSnap.data() as BeekeeperProfile);
+        } else {
+          setBeekeeperProfile(null);
+        }
+      }, (err) => {
+        console.warn('Beekeeper profile snapshot notice:', err);
+      });
     } catch (err) {
       console.warn('Firestore user doc read notice (using verified auth role):', err);
       const isSuper = checkIsSuperAdmin(fbUser.email);
@@ -165,19 +175,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: fbUser.email || '',
         displayName: fbUser.displayName || fbUser.email?.split('@')[0] || 'Honey User',
         role: resolvedRole,
-        beekeeperId: isBk ? 'BK-1001' : undefined,
-        labId: isLab ? 'LAB_CBRTI_PUNE' : undefined,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
       setUserProfile(fallbackProfile);
       setActiveRole(resolvedRole);
-
-      if (isBk) {
-        setBeekeeperProfile(createDemoBeekeeperProfile(fbUser.uid, fbUser.displayName || 'Sita Ram (Beekeeper)', fbUser.email || 'beekeeper.demo@honeychain.in'));
-      } else {
-        setBeekeeperProfile(null);
-      }
     }
   };
 
@@ -207,17 +209,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await syncUserData(user);
       } else {
         // True unauthenticated state: wipe any leftover cached profiles and reset role
+        cleanupBkListener();
         setUserProfile(null);
         setBeekeeperProfile(null);
         setActiveRole('CONSUMER');
         try {
           localStorage.removeItem('hc_cached_user');
+          localStorage.removeItem('hc_role');
+          localStorage.removeItem('hc_session');
         } catch {}
       }
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      cleanupBkListener();
+    };
   }, []);
 
   const signInWithGoogle = async () => {
@@ -258,7 +266,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveRole(newRole);
   };
 
-  const signUpWithEmail = async (email: string, pass: string, name: string, role: UserRole) => {
+  const signUpWithEmail = async (
+    email: string,
+    pass: string,
+    name: string,
+    role: UserRole,
+    beekeeperDetails?: BeekeeperSignupData
+  ) => {
     const cleanEmail = email.trim().toLowerCase();
     const isSuperAdmin = checkIsSuperAdmin(cleanEmail);
     
@@ -270,23 +284,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       assignedRole = 'ADMIN';
     } else if (PRE_PROVISIONED_LAB_EMAILS.some((e) => e.toLowerCase() === cleanEmail)) {
       assignedRole = 'LAB';
-    } else if (role === 'BEEKEEPER' || cleanEmail.includes('beekeeper')) {
+    } else if (role === 'BEEKEEPER') {
       assignedRole = 'BEEKEEPER';
     } else {
       assignedRole = 'CONSUMER';
     }
 
     const res = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
+    const nowIso = new Date().toISOString();
 
     const profile: UserProfile = {
       id: res.user.uid,
       email: cleanEmail,
       displayName: name || cleanEmail.split('@')[0],
       role: assignedRole,
-      beekeeperId: assignedRole === 'BEEKEEPER' ? 'BK-1001' : undefined,
-      labId: assignedRole === 'LAB' ? 'LAB_CBRTI_PUNE' : undefined,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      // NO beekeeperId or labId assigned yet at self-registration
+      createdAt: nowIso,
+      updatedAt: nowIso,
     };
 
     try {
@@ -295,7 +309,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await setDoc(doc(db, 'admins', res.user.uid), {
           uid: res.user.uid,
           email: cleanEmail,
-          createdAt: new Date().toISOString(),
+          createdAt: nowIso,
         });
       }
     } catch (dbErr) {
@@ -305,17 +319,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUserProfile(profile);
     setActiveRole(assignedRole);
 
+    // If registering as a Beekeeper: create initial registration with status: 'pending' (NO auto-approval, NO Beekeeper ID)
     if (assignedRole === 'BEEKEEPER') {
-      const demoBk = createDemoBeekeeperProfile(res.user.uid, name || cleanEmail.split('@')[0], cleanEmail);
-      setBeekeeperProfile(demoBk);
+      const pendingProfile: BeekeeperProfile = {
+        id: res.user.uid,
+        userId: res.user.uid,
+        name: name || cleanEmail.split('@')[0],
+        email: cleanEmail,
+        phone: beekeeperDetails?.phone || '',
+        state: beekeeperDetails?.state || 'Uttar Pradesh',
+        district: beekeeperDetails?.district || '',
+        address: beekeeperDetails?.address || '',
+        lat: beekeeperDetails?.lat ?? 26.8467,
+        lng: beekeeperDetails?.lng ?? 80.9462,
+        aadhaarLast4: beekeeperDetails?.aadhaarLast4 || '',
+        aadhaarHash: beekeeperDetails?.aadhaarHash || '',
+        madhukrantiId: beekeeperDetails?.madhukrantiId || '',
+        totalHivesPlanned: beekeeperDetails?.totalHivesPlanned || 10,
+        status: 'pending', // Defaults to Pending, awaiting Admin review
+        isSample: false,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      };
+
+      setBeekeeperProfile(pendingProfile);
       try {
-        await setDoc(doc(db, 'beekeepers', res.user.uid), demoBk);
-      } catch {}
+        await setDoc(doc(db, 'beekeepers', res.user.uid), pendingProfile);
+      } catch (bkErr) {
+        console.warn('Initial pending beekeeper doc error:', bkErr);
+      }
     }
 
     try {
       await logActivity({
-        action: 'USER_SIGNUP',
+        action: assignedRole === 'BEEKEEPER' ? 'BEEKEEPER_REGISTRATION_SUBMITTED' : 'USER_SIGNUP',
         entityType: 'SYSTEM',
         entityId: res.user.uid,
         details: `New account registered as ${assignedRole} (${cleanEmail})`,
@@ -325,20 +362,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    // 1. Immediately wipe any cached user items from localStorage
+    // 1. Clean up any active profile listeners
+    cleanupBkListener();
+
+    // 2. Immediately wipe any cached user items from localStorage
     try {
       localStorage.removeItem('hc_cached_user');
       localStorage.removeItem('hc_role');
       localStorage.removeItem('hc_session');
+      localStorage.removeItem('honeychain_cart');
     } catch {}
 
-    // 2. Immediately reset local context state to logged out / consumer
+    // 3. Immediately reset local context state to logged out / consumer
     setCurrentUser(null);
     setUserProfile(null);
     setBeekeeperProfile(null);
     setActiveRole('CONSUMER');
 
-    // 3. Log audit event non-blockingly
+    // 4. Log audit event non-blockingly
     if (currentUser) {
       try {
         await logActivity({
@@ -350,7 +391,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch {}
     }
 
-    // 4. Complete Firebase sign-out
+    // 5. Complete Firebase sign-out
     try {
       await fbSignOut(auth);
     } catch (error: unknown) {
@@ -413,3 +454,4 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 };
 
 export const useAuth = () => useContext(AuthContext);
+

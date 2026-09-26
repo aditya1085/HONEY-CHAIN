@@ -36,6 +36,7 @@ import {
   CheckCircle2,
   Calendar,
   MapPin,
+  Activity,
 } from 'lucide-react';
 import { db } from '../../firebase/config';
 import { handleFirestoreError, OperationType } from '../../firebase/errors';
@@ -49,6 +50,7 @@ import {
 import { CameraCapture, CapturedPhoto } from '../camera/CameraCapture';
 import { PrintableHiveSticker } from './PrintableHiveSticker';
 import { PairIoTDeviceModal } from './PairIoTDeviceModal';
+import { IoTSimulatorModal } from '../iot/IoTSimulatorModal';
 
 interface HiveDetailViewProps {
   hive: HiveRecord;
@@ -66,6 +68,7 @@ export const HiveDetailView: React.FC<HiveDetailViewProps> = ({ hive, onBack }) 
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isStickerOpen, setIsStickerOpen] = useState(false);
   const [isPairOpen, setIsPairOpen] = useState(false);
+  const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
   const [isScanningAI, setIsScanningAI] = useState(false);
   const [scanMessage, setScanMessage] = useState<string | null>(null);
 
@@ -249,6 +252,13 @@ export const HiveDetailView: React.FC<HiveDetailViewProps> = ({ hive, onBack }) 
         </button>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setIsSimulatorOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 font-bold text-xs transition border border-amber-500/30"
+          >
+            <Activity className="w-4 h-4 text-amber-500" /> IoT Simulator
+          </button>
+
           <button
             onClick={() => setIsCameraOpen(true)}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition shadow-sm"
@@ -740,6 +750,13 @@ export const HiveDetailView: React.FC<HiveDetailViewProps> = ({ hive, onBack }) 
         onClose={() => setIsPairOpen(false)}
         hives={[hive]}
         initialHiveId={hive.hiveId}
+      />
+
+      <IoTSimulatorModal
+        isOpen={isSimulatorOpen}
+        onClose={() => setIsSimulatorOpen(false)}
+        hiveId={hive.hiveId}
+        colonyType={hive.colonyType}
       />
     </div>
   );

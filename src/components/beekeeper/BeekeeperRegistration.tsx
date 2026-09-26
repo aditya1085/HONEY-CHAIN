@@ -34,6 +34,7 @@ export const BeekeeperRegistration: React.FC<BeekeeperRegistrationProps> = ({ on
   const [lng, setLng] = useState<number>(80.9462);
   const [aadhaarLast4, setAadhaarLast4] = useState('');
   const [madhukrantiId, setMadhukrantiId] = useState('');
+  const [totalHivesPlanned, setTotalHivesPlanned] = useState<number>(10);
   const [isAgreeTerms, setIsAgreeTerms] = useState(false);
 
   const [detectingGps, setDetectingGps] = useState(false);
@@ -119,6 +120,7 @@ export const BeekeeperRegistration: React.FC<BeekeeperRegistrationProps> = ({ on
         aadhaarLast4: aadhaarLast4.trim(),
         aadhaarHash,
         madhukrantiId: madhukrantiId.trim(),
+        totalHivesPlanned: Number(totalHivesPlanned) || 10,
         status: 'pending', // Awaiting Admin verification
         isSample: false,
         createdAt: new Date().toISOString(),
@@ -378,6 +380,24 @@ export const BeekeeperRegistration: React.FC<BeekeeperRegistrationProps> = ({ on
             />
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
               {t('reg.madhukrantiHint')}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Total Hives Planned *
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={5000}
+              required
+              value={totalHivesPlanned}
+              onChange={(e) => setTotalHivesPlanned(parseInt(e.target.value, 10) || 1)}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+            />
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+              Anticipated number of honey bee colonies/boxes to be managed
             </p>
           </div>
         </div>
