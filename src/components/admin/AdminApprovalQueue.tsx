@@ -25,6 +25,7 @@ import { handleFirestoreError, OperationType } from '../../firebase/errors';
 import { BeekeeperProfile, BeekeeperStatus, HiveRecord, HiveApprovalStage } from '../../types';
 import { generateBeekeeperId } from '../../services/idGenerators';
 import { logActivity } from '../../services/activityLogger';
+import { recordLedgerBlock } from '../../services/blockchainService';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { SAMPLE_DATA_MASTER } from '../../services/sampleDataMaster';
@@ -489,6 +490,7 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
       try {
         const hiveRef = doc(db, 'hives', selectedHive.id);
         await updateDoc(hiveRef, {
+          status: 'Pending Lab Health Verification',
           approvalStage: 'STAGE_2_LAB_VERIFICATION',
           approvalStatus: 'pending',
           adminStage1ApprovedBy: currentUser.uid,
@@ -497,6 +499,7 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
         });
         await setDoc(doc(db, 'hive_approval_queue', selectedHive.id), {
           ...selectedHive,
+          status: 'Pending Lab Health Verification',
           approvalStage: 'STAGE_2_LAB_VERIFICATION',
           approvalStatus: 'pending',
           adminStage1ApprovedBy: currentUser.uid,
@@ -505,6 +508,7 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
         }, { merge: true });
         await setDoc(doc(db, 'lab_verification_requests', selectedHive.id), {
           ...selectedHive,
+          status: 'Pending Lab Health Verification',
           approvalStage: 'STAGE_2_LAB_VERIFICATION',
           approvalStatus: 'pending',
           adminStage1ApprovedBy: currentUser.uid,
@@ -520,7 +524,7 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
           id: notifId,
           userId: selectedHive.beekeeperId,
           title: '✅ Hive Stage 1 Approved — Sent to Lab',
-          message: `Hive ${selectedHive.hiveId} has passed Stage 1 Admin Review! It has been forwarded to the Accredited Testing Laboratory for colony health & biosecurity verification.`,
+          message: `Hive ${selectedHive.hiveId} has passed Stage 1 Admin Review! It has been forwarded to the Accredited Testing Laboratory for colony health & biosecurity verification. Status: Pending Lab Health Verification.`,
           type: 'INFO' as const,
           read: false,
           createdAt: nowIso,
@@ -537,7 +541,7 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
         action: 'HIVE_STAGE_1_APPROVED',
         entityType: 'HIVE',
         entityId: selectedHive.hiveId,
-        details: `Admin approved Stage 1 for Hive ${selectedHive.hiveId}. Forwarded to Accredited Lab for biosecurity check.`,
+        details: `Admin approved Stage 1 for Hive ${selectedHive.hiveId}. Forwarded to Accredited Lab for biosecurity check. Status changed to Pending Lab Health Verification.`,
         actorRole: 'ADMIN',
       });
 
@@ -548,6 +552,7 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
           h.hiveId === hiveId || h.id === selectedHive.id
             ? {
                 ...h,
+                status: 'Pending Lab Health Verification' as const,
                 approvalStage: 'STAGE_2_LAB_VERIFICATION' as const,
                 approvalStatus: 'pending' as const,
                 adminStage1ApprovedBy: currentUser.uid,
@@ -565,6 +570,7 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
           h.hiveId === hiveId || h.id === selectedHive.id
             ? {
                 ...h,
+                status: 'Pending Lab Health Verification',
                 approvalStage: 'STAGE_2_LAB_VERIFICATION',
                 approvalStatus: 'pending',
                 adminStage1ApprovedBy: currentUser.uid,
@@ -605,11 +611,26 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
         console.warn('API final-approve warning:', apiErr);
       }
 
-      // 2. Update Firestore
+      // 2. Record in Ledger Block
+      try {
+        await recordLedgerBlock('HIVE_FINAL_APPROVED', hiveId, {
+          hiveId,
+          beekeeperId: selectedHive.beekeeperId,
+          colonyType: selectedHive.colonyType,
+          labVerdict: selectedHive.labVerdict || 'HEALTHY',
+          finalApprovedBy: currentUser.uid,
+          finalApprovedAt: nowIso,
+          status: 'Active',
+        });
+      } catch (ledgerErr) {
+        console.warn('Ledger block warning:', ledgerErr);
+      }
+
+      // 3. Update Firestore
       try {
         const hiveRef = doc(db, 'hives', selectedHive.id);
         await updateDoc(hiveRef, {
-          status: 'active',
+          status: 'Active',
           approvalStatus: 'approved',
           approvalStage: 'COMPLETED',
           finalApprovedBy: currentUser.uid,
@@ -618,7 +639,7 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
         });
         await setDoc(doc(db, 'hive_approval_queue', selectedHive.id), {
           ...selectedHive,
-          status: 'active',
+          status: 'Active',
           approvalStatus: 'approved',
           approvalStage: 'COMPLETED',
           finalApprovedBy: currentUser.uid,
@@ -627,14 +648,14 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
         }, { merge: true });
       } catch {}
 
-      // 3. Notify Beekeeper
+      // 4. Notify Beekeeper
       try {
         const notifId = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
         const notifPayload = {
           id: notifId,
           userId: selectedHive.beekeeperId,
           title: '🎉 Hive Live & Certified Active!',
-          message: `Congratulations! Your Hive ${selectedHive.hiveId} has received final Admin certification following Accredited Lab health check. The hive is now LIVE — you can pair IoT telemetry hardware and log honey harvests.`,
+          message: `Congratulations! Your Hive ${selectedHive.hiveId} has received final Admin certification following Accredited Lab health check. The hive status is now Active and ready for IoT pairing and honey batches.`,
           type: 'SUCCESS' as const,
           read: false,
           createdAt: nowIso,
@@ -651,18 +672,18 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
         action: 'HIVE_FINAL_APPROVED_ACTIVATED',
         entityType: 'HIVE',
         entityId: selectedHive.hiveId,
-        details: `Admin gave final approval for Hive ${selectedHive.hiveId} (Lab Verdict: ${selectedHive.labVerdict || 'HEALTHY'}). Hive is now ACTIVE.`,
+        details: `Admin gave final approval for Hive ${selectedHive.hiveId} (Lab Verdict: ${selectedHive.labVerdict || 'HEALTHY'}). Hive status changed to Active.`,
         actorRole: 'ADMIN',
       });
 
-      // 4. Update localStorage immediately for cross-persona reactivity
+      // 5. Update localStorage immediately for cross-persona reactivity
       try {
         const localHives: HiveRecord[] = JSON.parse(localStorage.getItem('hc_local_hives') || '[]');
         const updatedLocal = localHives.map((h) =>
           h.hiveId === hiveId || h.id === selectedHive.id
             ? {
                 ...h,
-                status: 'active' as const,
+                status: 'Active' as const,
                 approvalStatus: 'approved' as const,
                 approvalStage: 'COMPLETED' as const,
                 finalApprovedBy: currentUser.uid,
@@ -674,13 +695,13 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
         localStorage.setItem('hc_local_hives', JSON.stringify(updatedLocal));
       } catch {}
 
-      // 5. Update local state immediately
+      // 6. Update local state immediately
       setHives((prev) =>
         prev.map((h) =>
           h.hiveId === hiveId || h.id === selectedHive.id
             ? {
                 ...h,
-                status: 'active',
+                status: 'Active',
                 approvalStatus: 'approved',
                 approvalStage: 'COMPLETED',
                 finalApprovedBy: currentUser.uid,
@@ -734,7 +755,7 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
       try {
         const hiveRef = doc(db, 'hives', selectedHive.id);
         await updateDoc(hiveRef, {
-          status: 'inactive',
+          status: 'Rejected',
           approvalStatus: 'rejected',
           approvalStage: 'REJECTED',
           rejectionStage: stage,
@@ -745,7 +766,7 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
         });
         await setDoc(doc(db, 'hive_approval_queue', selectedHive.id), {
           ...selectedHive,
-          status: 'inactive',
+          status: 'Rejected',
           approvalStatus: 'rejected',
           approvalStage: 'REJECTED',
           rejectionStage: stage,
@@ -780,7 +801,7 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
         action: 'HIVE_REJECTED',
         entityType: 'HIVE',
         entityId: selectedHive.hiveId,
-        details: `Hive ${selectedHive.hiveId} rejected during ${stage}. Reason: ${hiveRejectionReason.trim()}`,
+        details: `Hive ${selectedHive.hiveId} rejected during ${stage}. Reason: ${hiveRejectionReason.trim()}. Status set to Rejected.`,
         actorRole: 'ADMIN',
       });
 
@@ -790,7 +811,7 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
           h.hiveId === hiveId || h.id === selectedHive.id
             ? {
                 ...h,
-                status: 'inactive',
+                status: 'Rejected',
                 approvalStatus: 'rejected',
                 approvalStage: 'REJECTED',
                 rejectionStage: stage,
@@ -817,10 +838,26 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
   const pendingBeekeepersCount = beekeepers.filter((b) => b.status?.toLowerCase() === 'pending').length;
 
   const stage1Hives = hives.filter(
-    (h) => h.approvalStage === 'STAGE_1_ADMIN_REVIEW' || (!h.approvalStage && h.approvalStatus === 'pending')
+    (h) =>
+      h.status === 'Pending Admin Review' ||
+      h.approvalStage === 'STAGE_1_ADMIN_REVIEW' ||
+      (!h.approvalStage && h.approvalStatus === 'pending' && h.status !== 'Active' && h.status !== 'active' && h.status !== 'Pending Lab Health Verification' && h.status !== 'Pending Admin Final Review' && h.status !== 'Rejected')
   );
-  const stage2LabPendingHives = hives.filter((h) => h.approvalStage === 'STAGE_2_LAB_VERIFICATION');
-  const stage2FinalHives = hives.filter((h) => h.approvalStage === 'STAGE_3_ADMIN_FINAL');
+  const stage2LabPendingHives = hives.filter(
+    (h) =>
+      (h.status === 'Pending Lab Health Verification' || h.approvalStage === 'STAGE_2_LAB_VERIFICATION') &&
+      h.status !== 'Active' &&
+      h.status !== 'active' &&
+      h.status !== 'Pending Admin Final Review' &&
+      h.status !== 'Rejected'
+  );
+  const stage2FinalHives = hives.filter(
+    (h) =>
+      (h.status === 'Pending Admin Final Review' || h.approvalStage === 'STAGE_3_ADMIN_FINAL') &&
+      h.status !== 'Active' &&
+      h.status !== 'active' &&
+      h.status !== 'Rejected'
+  );
   const pendingHivesCount = stage1Hives.length + stage2FinalHives.length;
 
   // Filtered Beekeepers

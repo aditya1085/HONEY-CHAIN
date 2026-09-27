@@ -40,9 +40,13 @@ import { generateMasterDataset, SAMPLE_DATA_MASTER } from './src/services/sample
 dotenv.config();
 
 const app = express();
-const PORT = parseInt(process.env.PORT || '3000', 10);
+const PORT = parseInt(process.env.DEFAULT_APP_PORT || (process.env.PORT && process.env.PORT !== '8080' ? process.env.PORT : '3000'), 10);
 
 app.use(express.json({ limit: '15mb' }));
+
+app.get(['/health', '/api/health'], (_req: Request, res: Response) => {
+  res.status(200).json({ status: 'ok', service: 'honey-chain', timestamp: new Date().toISOString() });
+});
 
 // Initialize Firebase for server-side persistence safely
 let fbApp: any = null;
@@ -3811,7 +3815,7 @@ app.post('/api/hives', async (req: Request, res: Response) => {
     const nowIso = new Date().toISOString();
     const normalizedHive = {
       ...hive,
-      status: hive.status || 'inactive',
+      status: 'Pending Admin Review',
       approvalStatus: hive.approvalStatus || 'pending',
       approvalStage: 'STAGE_1_ADMIN_REVIEW',
       createdAt: hive.createdAt || nowIso,
@@ -3900,6 +3904,7 @@ app.post('/api/hives/:hiveId/stage1-accept', async (req: Request, res: Response)
     const nowIso = new Date().toISOString();
     const updated = {
       ...hive,
+      status: 'Pending Lab Health Verification',
       approvalStage: 'STAGE_2_LAB_VERIFICATION',
       approvalStatus: 'pending',
       adminStage1ApprovedBy: adminUid || 'admin',
@@ -3939,7 +3944,7 @@ app.post('/api/hives/:hiveId/stage1-accept', async (req: Request, res: Response)
       action: 'HIVE_STAGE_1_APPROVED',
       entityType: 'HIVE',
       entityId: hive.hiveId,
-      details: `Admin approved Stage 1 for Hive ${hive.hiveId}. Forwarded to Accredited Lab for biosecurity check.`,
+      details: `Admin approved Stage 1 for Hive ${hive.hiveId}. Forwarded to Accredited Lab for biosecurity check. Status changed to Pending Lab Health Verification.`,
       actorRole: 'ADMIN',
       timestamp: nowIso,
     });
@@ -3948,6 +3953,7 @@ app.post('/api/hives/:hiveId/stage1-accept', async (req: Request, res: Response)
     try {
       const docId = hive.id || `HIVE_${hive.hiveId.replace(/[^a-zA-Z0-9]/g, '_')}`;
       await updateDoc(doc(db, 'hives', docId), {
+        status: 'Pending Lab Health Verification',
         approvalStage: 'STAGE_2_LAB_VERIFICATION',
         approvalStatus: 'pending',
         adminStage1ApprovedBy: adminUid || 'admin',
@@ -3990,7 +3996,7 @@ app.post('/api/hives/:hiveId/stage1-reject', async (req: Request, res: Response)
     const nowIso = new Date().toISOString();
     const updated = {
       ...hive,
-      status: 'inactive',
+      status: 'Rejected',
       approvalStatus: 'rejected',
       approvalStage: 'REJECTED',
       rejectionStage: 'STAGE_1_ADMIN',
@@ -4020,10 +4026,25 @@ app.post('/api/hives/:hiveId/stage1-reject', async (req: Request, res: Response)
       action: 'HIVE_REJECTED',
       entityType: 'HIVE',
       entityId: hive.hiveId,
-      details: `Hive ${hive.hiveId} rejected during Stage 1. Reason: ${reason}`,
+      details: `Hive ${hive.hiveId} rejected during Stage 1. Reason: ${reason}. Status changed to Rejected.`,
       actorRole: 'ADMIN',
       timestamp: nowIso,
     });
+
+    // Background Firestore attempt
+    try {
+      const docId = hive.id || `HIVE_${hive.hiveId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      await updateDoc(doc(db, 'hives', docId), {
+        status: 'Rejected',
+        approvalStatus: 'rejected',
+        approvalStage: 'REJECTED',
+        rejectionStage: 'STAGE_1_ADMIN',
+        rejectionReason: reason || 'Requirements not met during initial administrative review.',
+        rejectedBy: adminUid || 'admin',
+        rejectedAt: nowIso,
+        updatedAt: nowIso,
+      });
+    } catch {}
 
     res.json({ success: true, hive: updated });
   } catch (err) {
@@ -4059,6 +4080,7 @@ app.post('/api/hives/:hiveId/lab-verdict', async (req: Request, res: Response) =
     const nowIso = new Date().toISOString();
     const updated = {
       ...hive,
+      status: 'Pending Admin Final Review',
       approvalStage: 'STAGE_3_ADMIN_FINAL',
       labVerdict: verdict || 'HEALTHY',
       labVerdictNotes: notes || '',
@@ -4099,7 +4121,7 @@ app.post('/api/hives/:hiveId/lab-verdict', async (req: Request, res: Response) =
       action: 'HIVE_LAB_HEALTH_VERIFIED',
       entityType: 'HIVE',
       entityId: hive.hiveId,
-      details: `Accredited Lab certified health check for Hive ${hive.hiveId}. Verdict: ${verdict}. Notes: ${notes}`,
+      details: `Accredited Lab certified health check for Hive ${hive.hiveId}. Verdict: ${verdict}. Notes: ${notes}. Status changed to Pending Admin Final Review.`,
       actorRole: 'LAB',
       timestamp: nowIso,
     });
@@ -4108,6 +4130,7 @@ app.post('/api/hives/:hiveId/lab-verdict', async (req: Request, res: Response) =
     try {
       const docId = hive.id || `HIVE_${hive.hiveId.replace(/[^a-zA-Z0-9]/g, '_')}`;
       await updateDoc(doc(db, 'hives', docId), {
+        status: 'Pending Admin Final Review',
         approvalStage: 'STAGE_3_ADMIN_FINAL',
         labVerdict: verdict || 'HEALTHY',
         labVerdictNotes: notes || '',
@@ -4152,7 +4175,7 @@ app.post('/api/hives/:hiveId/final-approve', async (req: Request, res: Response)
     const nowIso = new Date().toISOString();
     const updated = {
       ...hive,
-      status: 'active',
+      status: 'Active',
       approvalStatus: 'approved',
       approvalStage: 'COMPLETED',
       finalApprovedBy: adminUid || 'admin',
@@ -4189,7 +4212,7 @@ app.post('/api/hives/:hiveId/final-approve', async (req: Request, res: Response)
     try {
       const docId = hive.id || `HIVE_${hive.hiveId.replace(/[^a-zA-Z0-9]/g, '_')}`;
       await updateDoc(doc(db, 'hives', docId), {
-        status: 'active',
+        status: 'Active',
         approvalStatus: 'approved',
         approvalStage: 'COMPLETED',
         finalApprovedBy: adminUid || 'admin',
@@ -4232,7 +4255,7 @@ app.post('/api/hives/:hiveId/final-reject', async (req: Request, res: Response) 
     const nowIso = new Date().toISOString();
     const updated = {
       ...hive,
-      status: 'inactive',
+      status: 'Rejected',
       approvalStatus: 'rejected',
       approvalStage: 'REJECTED',
       rejectionStage: 'STAGE_2_ADMIN_FINAL',
@@ -4241,6 +4264,46 @@ app.post('/api/hives/:hiveId/final-reject', async (req: Request, res: Response) 
       rejectedAt: nowIso,
       updatedAt: nowIso,
     };
+
+    serverHives.set(hive.hiveId, updated);
+    if (hive.id) serverHives.set(hive.id, updated);
+
+    // Notify Beekeeper
+    serverNotifications.unshift({
+      id: `notif_bk_${Date.now()}`,
+      userId: hive.beekeeperId,
+      title: '❌ Hive Registration Rejected (Final Review)',
+      message: `Hive ${hive.hiveId} was rejected during Stage 2 Final Admin Review. Reason: ${reason}`,
+      type: 'ALERT',
+      read: false,
+      createdAt: nowIso,
+    });
+
+    // Log Activity
+    serverActivityLogs.unshift({
+      id: `log_${Date.now()}`,
+      action: 'HIVE_REJECTED',
+      entityType: 'HIVE',
+      entityId: hive.hiveId,
+      details: `Hive ${hive.hiveId} rejected during Final Admin Review. Reason: ${reason}. Status changed to Rejected.`,
+      actorRole: 'ADMIN',
+      timestamp: nowIso,
+    });
+
+    // Background Firestore attempt
+    try {
+      const docId = hive.id || `HIVE_${hive.hiveId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      await updateDoc(doc(db, 'hives', docId), {
+        status: 'Rejected',
+        approvalStatus: 'rejected',
+        approvalStage: 'REJECTED',
+        rejectionStage: 'STAGE_2_ADMIN_FINAL',
+        rejectionReason: reason || 'Colony health verification criteria not met.',
+        rejectedBy: adminUid || 'admin',
+        rejectedAt: nowIso,
+        updatedAt: nowIso,
+      });
+    } catch {}
 
     serverHives.set(hive.hiveId, updated);
     if (hive.id) serverHives.set(hive.id, updated);
@@ -4792,7 +4855,7 @@ async function startServer() {
     }
   }
 
-  const portNumber = parseInt(process.env.PORT || '3000', 10);
+  const portNumber = parseInt(process.env.DEFAULT_APP_PORT || (process.env.PORT && process.env.PORT !== '8080' ? process.env.PORT : '3000'), 10);
   const server = app.listen(portNumber, '0.0.0.0', () => {
     console.log(`[Honey Chain] Full-Stack server running on http://0.0.0.0:${portNumber} (PID: ${process.pid}, isProduction: ${isProduction})`);
   });

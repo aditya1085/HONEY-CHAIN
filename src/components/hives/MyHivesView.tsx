@@ -118,11 +118,21 @@ export const MyHivesView: React.FC = () => {
         try {
           local = JSON.parse(localStorage.getItem('hc_local_hives') || '[]');
         } catch {}
-        const combined = [...local, ...list.filter((h) => !local.some((l) => l.hiveId === h.hiveId))];
-        if (combined.length > 0) {
-          combined.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-          setHives(combined);
+        const byKey = new Map<string, HiveRecord>();
+        for (const h of SAMPLE_DATA_MASTER.hives.filter((s) => s.beekeeperId === bkId)) {
+          byKey.set(h.hiveId, h);
         }
+        for (const h of local) {
+          if (h.beekeeperId === bkId || !h.beekeeperId) {
+            byKey.set(h.hiveId, h);
+          }
+        }
+        for (const h of list) {
+          byKey.set(h.hiveId, h);
+        }
+        const combined = Array.from(byKey.values());
+        combined.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        setHives(combined);
         setLoading(false);
       },
       (err) => {
@@ -165,18 +175,20 @@ export const MyHivesView: React.FC = () => {
   });
 
   const totalYield = hives.reduce((sum, h) => sum + (h.expectedProduction || 0), 0);
-  const activeHivesCount = hives.filter((h) => h.status === 'active' && h.approvalStatus !== 'rejected').length;
+  const activeHivesCount = hives.filter(
+    (h) => (h.status === 'Active' || h.status === 'active' || h.approvalStage === 'COMPLETED') && h.approvalStatus !== 'rejected' && h.status !== 'Rejected'
+  ).length;
   const iotPairedCount = hives.filter((h) => Boolean(h.iotDeviceId)).length;
 
   const renderHiveBadge = (hive: HiveRecord) => {
-    if (hive.approvalStatus === 'rejected') {
+    if (hive.status === 'Rejected' || hive.approvalStatus === 'rejected' || hive.approvalStage === 'REJECTED') {
       return (
         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300 border border-red-500/30">
           REJECTED
         </span>
       );
     }
-    if (hive.status === 'active' || hive.approvalStage === 'COMPLETED' || (hive.approvalStatus === 'approved' && !hive.approvalStage)) {
+    if (hive.status === 'Active' || hive.status === 'active' || hive.approvalStage === 'COMPLETED' || (hive.approvalStatus === 'approved' && !hive.approvalStage)) {
       return (
         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -184,26 +196,26 @@ export const MyHivesView: React.FC = () => {
         </span>
       );
     }
-    if (hive.approvalStage === 'STAGE_2_LAB_VERIFICATION') {
+    if (hive.status === 'Pending Lab Health Verification' || hive.approvalStage === 'STAGE_2_LAB_VERIFICATION') {
       return (
         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-500/30 flex items-center gap-1">
           <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-          STAGE 2: LAB VERIFICATION
+          PENDING LAB HEALTH VERIFICATION
         </span>
       );
     }
-    if (hive.approvalStage === 'STAGE_3_ADMIN_FINAL') {
+    if (hive.status === 'Pending Admin Final Review' || hive.approvalStage === 'STAGE_3_ADMIN_FINAL') {
       return (
         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-500/30 flex items-center gap-1">
           <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
-          STAGE 2 FINAL: ADMIN REVIEW
+          PENDING ADMIN FINAL REVIEW
         </span>
       );
     }
     return (
       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-500/30 flex items-center gap-1">
         <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-        STAGE 1: ADMIN REVIEW
+        PENDING ADMIN REVIEW
       </span>
     );
   };

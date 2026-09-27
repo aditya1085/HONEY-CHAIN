@@ -288,6 +288,7 @@ export const LabPortal: React.FC<LabPortalProps> = ({ currentUserId, userRole })
       try {
         const hiveRef = doc(db, 'hives', selectedHiveForHealth.id);
         await updateDoc(hiveRef, {
+          status: 'Pending Admin Final Review',
           approvalStage: 'STAGE_3_ADMIN_FINAL',
           labVerdict: hiveVerdict,
           labVerdictNotes: hiveVerdictNotes.trim(),
@@ -298,6 +299,7 @@ export const LabPortal: React.FC<LabPortalProps> = ({ currentUserId, userRole })
         });
         await setDoc(doc(db, 'hive_approval_queue', selectedHiveForHealth.id), {
           ...selectedHiveForHealth,
+          status: 'Pending Admin Final Review',
           approvalStage: 'STAGE_3_ADMIN_FINAL',
           labVerdict: hiveVerdict,
           labVerdictNotes: hiveVerdictNotes.trim(),
@@ -335,7 +337,7 @@ export const LabPortal: React.FC<LabPortalProps> = ({ currentUserId, userRole })
           id: beekeeperNotifId,
           userId: selectedHiveForHealth.beekeeperId,
           title: `🔬 Lab Health Verdict: ${hiveVerdict}`,
-          message: `Accredited Lab ${activeLab?.labName || 'CBRTI'} verified your Hive ${selectedHiveForHealth.hiveId} with verdict: ${hiveVerdict}. It is now in the final Admin review queue for live activation.`,
+          message: `Accredited Lab ${activeLab?.labName || 'CBRTI'} verified your Hive ${selectedHiveForHealth.hiveId} with verdict: ${hiveVerdict}. It is now in the final Admin review queue for live activation. Status: Pending Admin Final Review.`,
           type: hiveVerdict === 'HEALTHY' ? ('SUCCESS' as const) : ('ALERT' as const),
           read: false,
           createdAt: nowIso,
@@ -353,7 +355,7 @@ export const LabPortal: React.FC<LabPortalProps> = ({ currentUserId, userRole })
         action: 'HIVE_LAB_HEALTH_VERIFIED',
         entityType: 'HIVE',
         entityId: selectedHiveForHealth.hiveId,
-        details: `Accredited Lab certified health check for Hive ${selectedHiveForHealth.hiveId}. Verdict: ${hiveVerdict}. Notes: ${hiveVerdictNotes.trim()}`,
+        details: `Accredited Lab certified health check for Hive ${selectedHiveForHealth.hiveId}. Verdict: ${hiveVerdict}. Notes: ${hiveVerdictNotes.trim()}. Status set to Pending Admin Final Review.`,
       });
 
       // 5. Update localStorage immediately for cross-persona reactivity
@@ -363,6 +365,7 @@ export const LabPortal: React.FC<LabPortalProps> = ({ currentUserId, userRole })
           h.hiveId === hiveId || h.id === selectedHiveForHealth.id
             ? {
                 ...h,
+                status: 'Pending Admin Final Review' as const,
                 approvalStage: 'STAGE_3_ADMIN_FINAL' as const,
                 labVerdict: hiveVerdict,
                 labVerdictNotes: hiveVerdictNotes.trim(),
@@ -382,6 +385,7 @@ export const LabPortal: React.FC<LabPortalProps> = ({ currentUserId, userRole })
           h.hiveId === hiveId || h.id === selectedHiveForHealth.id
             ? {
                 ...h,
+                status: 'Pending Admin Final Review',
                 approvalStage: 'STAGE_3_ADMIN_FINAL',
                 labVerdict: hiveVerdict,
                 labVerdictNotes: hiveVerdictNotes.trim(),
@@ -570,7 +574,16 @@ export const LabPortal: React.FC<LabPortalProps> = ({ currentUserId, userRole })
     }
   };
 
-  const stage2Hives = hives.filter((h) => h.approvalStage === 'STAGE_2_LAB_VERIFICATION');
+  const stage2Hives = hives.filter(
+    (h) =>
+      (h.status === 'Pending Lab Health Verification' || h.approvalStage === 'STAGE_2_LAB_VERIFICATION') &&
+      h.status !== 'Pending Admin Final Review' &&
+      h.status !== 'Active' &&
+      h.status !== 'active' &&
+      h.status !== 'Rejected' &&
+      h.approvalStage !== 'STAGE_3_ADMIN_FINAL' &&
+      h.approvalStage !== 'COMPLETED'
+  );
   const verifiedHivesHistory = hives.filter((h) => h.labVerdict != null);
 
   return (

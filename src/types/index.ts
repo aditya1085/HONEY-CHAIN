@@ -9,7 +9,15 @@ export type BeekeeperStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
 export type HiveType = 'Langstroth' | 'KTB' | 'Traditional' | 'Other';
 export type ColonyType = 'Apis cerana indica' | 'Apis mellifera' | 'Apis dorsata' | 'Apis florea' | 'Stingless';
 export type LandType = 'Forest' | 'Farmland' | 'Urban' | 'Orchard' | 'Mangrove' | 'Other';
-export type HiveStatus = 'active' | 'inactive' | 'decommissioned';
+export type HiveStatus =
+  | 'Pending Admin Review'
+  | 'Pending Lab Health Verification'
+  | 'Pending Admin Final Review'
+  | 'Active'
+  | 'Rejected'
+  | 'active'
+  | 'inactive'
+  | 'decommissioned';
 
 export interface UserProfile {
   id: string;
@@ -606,6 +614,7 @@ export interface NotificationRecord {
 
 export type LedgerEventType =
   | 'HIVE_REGISTERED'
+  | 'HIVE_FINAL_APPROVED'
   | 'BATCH_CREATED'
   | 'BATCH_VERIFIED'
   | 'LAB_REPORT_HASHED'

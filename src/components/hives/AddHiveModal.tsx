@@ -116,7 +116,7 @@ export const AddHiveModal: React.FC<AddHiveModalProps> = ({ isOpen, onClose, onS
         setupDate,
         registrationDate: new Date().toISOString(),
         expectedProduction: Number(expectedProduction) || 15,
-        status: 'inactive',
+        status: 'Pending Admin Review',
         approvalStatus: 'pending',
         approvalStage: 'STAGE_1_ADMIN_REVIEW',
         isSample: false,
