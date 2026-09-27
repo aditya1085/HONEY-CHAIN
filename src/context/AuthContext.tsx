@@ -204,12 +204,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }, { merge: true });
           data.role = 'ADMIN';
         } else if (currentRole === 'BEEKEEPER' && data.role !== 'BEEKEEPER' && data.role !== 'ADMIN') {
-          // Keep Firestore user doc in sync with Beekeeper role
+          // Keep Firestore user doc in sync with Beekeeper role (do NOT overwrite beekeeperId unless assigned)
           try {
-            await updateDoc(userRef, { role: 'BEEKEEPER', beekeeperId: 'B001', updatedAt: new Date().toISOString() });
+            await updateDoc(userRef, { role: 'BEEKEEPER', updatedAt: new Date().toISOString() });
           } catch {}
           data.role = 'BEEKEEPER';
-          data.beekeeperId = 'B001';
         } else if (currentRole === 'LAB' && data.role !== 'LAB') {
           try {
             await updateDoc(userRef, { role: 'LAB', labId: 'LAB_CBRTI_PUNE', updatedAt: new Date().toISOString() });
@@ -236,13 +235,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           displayName:
             initialRole === 'ADMIN'
               ? 'Aditya Tripathi (Admin)'
-              : initialRole === 'BEEKEEPER'
+              : cleanEmail === 'beekeeper.demo@honeychain.in'
               ? 'Sita Ram (Beekeeper)'
               : initialRole === 'LAB'
               ? 'NABL Central Quality Laboratory'
               : fbUser.displayName || fbUser.email?.split('@')[0] || 'Honey User',
           role: initialRole,
-          beekeeperId: initialRole === 'BEEKEEPER' ? 'B001' : undefined,
+          beekeeperId: cleanEmail === 'beekeeper.demo@honeychain.in' ? 'B001' : undefined,
           labId: initialRole === 'LAB' ? 'LAB_CBRTI_PUNE' : undefined,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -294,21 +293,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             localStorage.setItem('hc_role', 'BEEKEEPER');
           } catch {}
         } else {
-          setBeekeeperProfile((current) => current);
+          // If not in Firestore directly, check localStorage or backend API
+          try {
+            const localBks: BeekeeperProfile[] = JSON.parse(localStorage.getItem('hc_local_beekeepers') || '[]');
+            const localMatch = localBks.find((b) => b.id === fbUser.uid || b.userId === fbUser.uid);
+            if (localMatch) {
+              setBeekeeperProfile(localMatch);
+            }
+          } catch {}
         }
       }, (err) => {
         console.warn('Beekeeper profile snapshot notice:', err);
       });
     } catch (err) {
       console.warn('Firestore user doc read notice (using verified auth role):', err);
-      const isSuper = checkIsSuperAdmin(fbUser.email);
-      const isLab = PRE_PROVISIONED_LAB_EMAILS.some((e) => e.toLowerCase() === fbUser.email?.toLowerCase());
+      const fallbackEmail = (fbUser.email || '').toLowerCase();
+      const isSuper = checkIsSuperAdmin(fallbackEmail);
+      const isLab = PRE_PROVISIONED_LAB_EMAILS.some((e) => e.toLowerCase() === fallbackEmail);
       const savedUserRole = (
         localStorage.getItem(`hc_user_role_${fbUser.uid}`) ||
-        localStorage.getItem(`hc_user_role_${(fbUser.email || '').toLowerCase()}`) ||
+        localStorage.getItem(`hc_user_role_${fallbackEmail}`) ||
         localStorage.getItem('hc_last_signup_role')
       ) as UserRole | null;
-      const isBk = (fbUser.email || '').toLowerCase().includes('beekeeper') || savedUserRole === 'BEEKEEPER';
+      const isBk = fallbackEmail.includes('beekeeper') || savedUserRole === 'BEEKEEPER';
       const resolvedRole: UserRole = isSuper ? 'ADMIN' : isLab ? 'LAB' : isBk ? 'BEEKEEPER' : 'CONSUMER';
 
       const fallbackProfile: UserProfile = {
@@ -317,19 +324,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         displayName:
           resolvedRole === 'ADMIN'
             ? 'Aditya Tripathi (Admin)'
-            : resolvedRole === 'BEEKEEPER'
+            : fallbackEmail === 'beekeeper.demo@honeychain.in'
             ? 'Sita Ram (Beekeeper)'
             : resolvedRole === 'LAB'
             ? 'NABL Central Quality Laboratory'
-            : fbUser.displayName || fbUser.email?.split('@')[0] || 'Arjun Sharma',
+            : fbUser.displayName || fbUser.email?.split('@')[0] || 'Honey User',
         role: resolvedRole,
-        beekeeperId: resolvedRole === 'BEEKEEPER' ? 'B001' : undefined,
+        beekeeperId: fallbackEmail === 'beekeeper.demo@honeychain.in' ? 'B001' : undefined,
         labId: resolvedRole === 'LAB' ? 'LAB_CBRTI_PUNE' : undefined,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
-      if (resolvedRole === 'BEEKEEPER') {
+      if (fallbackEmail === 'beekeeper.demo@honeychain.in') {
         const bkData: BeekeeperProfile = {
           id: fbUser.uid,
           userId: fbUser.uid,
@@ -353,6 +360,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           updatedAt: new Date().toISOString(),
         };
         setBeekeeperProfile(bkData);
+      } else if (resolvedRole === 'BEEKEEPER') {
+        // For new non-demo beekeeper, check local storage or API for their real pending profile
+        let matched: BeekeeperProfile | null = null;
+        try {
+          const localBks: BeekeeperProfile[] = JSON.parse(localStorage.getItem('hc_local_beekeepers') || '[]');
+          matched = localBks.find((b) => b.id === fbUser.uid || b.userId === fbUser.uid || (fallbackEmail && b.email?.toLowerCase() === fallbackEmail)) || null;
+        } catch {}
+
+        if (matched) {
+          setBeekeeperProfile(matched);
+          if (matched.beekeeperId) fallbackProfile.beekeeperId = matched.beekeeperId;
+        } else {
+          const initialPending: BeekeeperProfile = {
+            id: fbUser.uid,
+            userId: fbUser.uid,
+            name: fbUser.displayName || fallbackEmail.split('@')[0],
+            email: fallbackEmail,
+            phone: '',
+            state: 'Uttar Pradesh',
+            district: '',
+            address: '',
+            lat: 26.8467,
+            lng: 80.9462,
+            aadhaarLast4: '',
+            aadhaarHash: '',
+            madhukrantiId: '',
+            totalHivesPlanned: 10,
+            status: 'pending',
+            isSample: false,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          setBeekeeperProfile(initialPending);
+        }
       }
 
       setUserProfile(fallbackProfile);
@@ -372,11 +413,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const bkRef = doc(db, 'beekeepers', currentUser.uid);
       const bkSnap = await getDoc(bkRef);
       if (bkSnap.exists()) {
-        setBeekeeperProfile(bkSnap.data() as BeekeeperProfile);
+        const data = bkSnap.data() as BeekeeperProfile;
+        setBeekeeperProfile(data);
+        if (data.beekeeperId) {
+          setUserProfile((prev) => (prev ? { ...prev, beekeeperId: data.beekeeperId } : prev));
+        }
+        return;
       }
-    } catch (err) {
-      handleFirestoreError(err, OperationType.GET, `beekeepers/${currentUser.uid}`);
-    }
+    } catch (err) {}
+
+    // Fallback to backend API
+    try {
+      const res = await fetch('/api/beekeepers');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.beekeepers)) {
+          const match = data.beekeepers.find(
+            (b: any) =>
+              b.id === currentUser.uid ||
+              b.userId === currentUser.uid ||
+              (currentUser.email && b.email?.toLowerCase() === currentUser.email.toLowerCase())
+          );
+          if (match) {
+            setBeekeeperProfile(match);
+            if (match.beekeeperId) {
+              setUserProfile((prev) => (prev ? { ...prev, beekeeperId: match.beekeeperId } : prev));
+            }
+            return;
+          }
+        }
+      }
+    } catch {}
+
+    // Fallback to localStorage
+    try {
+      const local: BeekeeperProfile[] = JSON.parse(localStorage.getItem('hc_local_beekeepers') || '[]');
+      const match = local.find(
+        (b) =>
+          b.id === currentUser.uid ||
+          b.userId === currentUser.uid ||
+          (currentUser.email && b.email?.toLowerCase() === currentUser.email.toLowerCase())
+      );
+      if (match) {
+        setBeekeeperProfile(match);
+        if (match.beekeeperId) {
+          setUserProfile((prev) => (prev ? { ...prev, beekeeperId: match.beekeeperId } : prev));
+        }
+      }
+    } catch {}
   };
 
   useEffect(() => {

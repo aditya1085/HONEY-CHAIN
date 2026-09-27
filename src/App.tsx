@@ -418,7 +418,7 @@ const MainContent: React.FC = () => {
               onNavigateToHives={() => setCurrentTab('my-hives')}
             />
           ) : (
-            <BeekeeperRegistration onSuccess={() => setCurrentTab('my-hives')} />
+            <BeekeeperRegistration onSuccess={() => setCurrentTab('beekeeper-register')} />
           )
         )}
 

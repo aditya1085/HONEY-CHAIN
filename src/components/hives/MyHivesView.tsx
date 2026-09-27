@@ -18,7 +18,7 @@ import { db } from '../../firebase/config';
 import { handleFirestoreError, OperationType } from '../../firebase/errors';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
-import { HiveRecord } from '../../types';
+import { HiveRecord, BeekeeperProfile } from '../../types';
 import { SAMPLE_DATA_MASTER } from '../../services/sampleDataMaster';
 import { AddHiveModal } from './AddHiveModal';
 import { PrintableHiveSticker } from './PrintableHiveSticker';
@@ -30,12 +30,32 @@ export const MyHivesView: React.FC = () => {
   const { beekeeperProfile, currentUser } = useAuth();
   const { t } = useLanguage();
 
-  // If beekeeper is not approved yet, display pending status view
-  if (beekeeperProfile && beekeeperProfile.status !== 'approved') {
-    return <PendingApprovalView beekeeper={beekeeperProfile} />;
+  // If beekeeper is not approved yet or has no assigned beekeeperId, display pending status view
+  if (!beekeeperProfile || beekeeperProfile.status !== 'approved' || !beekeeperProfile.beekeeperId) {
+    const pendingFallback: BeekeeperProfile = beekeeperProfile || {
+      id: currentUser?.uid || 'pending_bk',
+      userId: currentUser?.uid || 'pending_bk',
+      name: currentUser?.displayName || 'Registered Beekeeper',
+      email: currentUser?.email || '',
+      phone: '',
+      state: 'Uttar Pradesh',
+      district: '',
+      address: '',
+      lat: 26.8467,
+      lng: 80.9462,
+      aadhaarLast4: '',
+      aadhaarHash: '',
+      madhukrantiId: '',
+      totalHivesPlanned: 10,
+      status: 'pending',
+      isSample: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    return <PendingApprovalView beekeeper={pendingFallback} />;
   }
 
-  const bkId = beekeeperProfile?.beekeeperId || 'B001';
+  const bkId = beekeeperProfile.beekeeperId;
 
   const [hives, setHives] = useState<HiveRecord[]>(() => {
     let local: HiveRecord[] = [];

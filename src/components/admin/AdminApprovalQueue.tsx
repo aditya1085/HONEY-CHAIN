@@ -175,13 +175,25 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
   // Helper to merge and sort hives
   const processHivesList = (incoming: HiveRecord[]) => {
     setHives((prev) => {
-      const liveIds = new Set(incoming.map((h) => h.id || h.hiveId));
-      const combined = [
-        ...incoming,
-        ...prev.filter((h) => !liveIds.has(h.id || h.hiveId)),
-        ...SAMPLE_DATA_MASTER.hives.filter((h) => !liveIds.has(h.id || h.hiveId)),
-      ];
-      const unique = Array.from(new Map(combined.map((h) => [h.hiveId || h.id, h])).values());
+      const byKey = new Map<string, HiveRecord>();
+      for (const h of SAMPLE_DATA_MASTER.hives) {
+        byKey.set(h.hiveId, h);
+        if (h.id) byKey.set(h.id, h);
+      }
+      for (const h of prev) {
+        byKey.set(h.hiveId, h);
+        if (h.id) byKey.set(h.id, h);
+      }
+      for (const h of incoming) {
+        byKey.set(h.hiveId, h);
+        if (h.id) byKey.set(h.id, h);
+      }
+      const uniqueMap = new Map<string, HiveRecord>();
+      for (const h of byKey.values()) {
+        const k = h.hiveId || h.id;
+        uniqueMap.set(k, h);
+      }
+      const unique = Array.from(uniqueMap.values());
       unique.sort((a, b) => {
         const aPending = a.approvalStage === 'STAGE_1_ADMIN_REVIEW' || a.approvalStage === 'STAGE_3_ADMIN_FINAL';
         const bPending = b.approvalStage === 'STAGE_1_ADMIN_REVIEW' || b.approvalStage === 'STAGE_3_ADMIN_FINAL';
@@ -529,7 +541,25 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
         actorRole: 'ADMIN',
       });
 
-      // 4. Update local state immediately
+      // 4. Update localStorage immediately for cross-persona reactivity
+      try {
+        const localHives: HiveRecord[] = JSON.parse(localStorage.getItem('hc_local_hives') || '[]');
+        const updatedLocal = localHives.map((h) =>
+          h.hiveId === hiveId || h.id === selectedHive.id
+            ? {
+                ...h,
+                approvalStage: 'STAGE_2_LAB_VERIFICATION' as const,
+                approvalStatus: 'pending' as const,
+                adminStage1ApprovedBy: currentUser.uid,
+                adminStage1ApprovedAt: nowIso,
+                updatedAt: nowIso,
+              }
+            : h
+        );
+        localStorage.setItem('hc_local_hives', JSON.stringify(updatedLocal));
+      } catch {}
+
+      // 5. Update local state immediately
       setHives((prev) =>
         prev.map((h) =>
           h.hiveId === hiveId || h.id === selectedHive.id
@@ -625,7 +655,26 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
         actorRole: 'ADMIN',
       });
 
-      // 4. Update local state immediately
+      // 4. Update localStorage immediately for cross-persona reactivity
+      try {
+        const localHives: HiveRecord[] = JSON.parse(localStorage.getItem('hc_local_hives') || '[]');
+        const updatedLocal = localHives.map((h) =>
+          h.hiveId === hiveId || h.id === selectedHive.id
+            ? {
+                ...h,
+                status: 'active' as const,
+                approvalStatus: 'approved' as const,
+                approvalStage: 'COMPLETED' as const,
+                finalApprovedBy: currentUser.uid,
+                finalApprovedAt: nowIso,
+                updatedAt: nowIso,
+              }
+            : h
+        );
+        localStorage.setItem('hc_local_hives', JSON.stringify(updatedLocal));
+      } catch {}
+
+      // 5. Update local state immediately
       setHives((prev) =>
         prev.map((h) =>
           h.hiveId === hiveId || h.id === selectedHive.id

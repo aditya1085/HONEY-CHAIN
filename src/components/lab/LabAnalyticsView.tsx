@@ -86,6 +86,12 @@ export const LabAnalyticsView: React.FC<LabAnalyticsViewProps> = ({
   const [loadingAI, setLoadingAI] = useState<boolean>(false);
   const [aiInsights, setAiInsights] = useState<AILabInsights | null>(null);
 
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
   // Fallback to sample data master
   const batches = SAMPLE_DATA_MASTER.batches;
   const labReports = SAMPLE_DATA_MASTER.labReports;

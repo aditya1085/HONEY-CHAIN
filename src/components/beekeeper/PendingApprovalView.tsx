@@ -1,7 +1,8 @@
-import React from 'react';
-import { Clock, ShieldAlert, CheckCircle2, QrCode, MapPin, Award, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Clock, ShieldAlert, CheckCircle2, QrCode, MapPin, Award, ArrowRight, RefreshCw } from 'lucide-react';
 import { BeekeeperProfile } from '../../types';
 import { useLanguage } from '../../context/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
 
 interface PendingApprovalViewProps {
   beekeeper: BeekeeperProfile;
@@ -13,8 +14,32 @@ export const PendingApprovalView: React.FC<PendingApprovalViewProps> = ({
   onNavigateToHives,
 }) => {
   const { t } = useLanguage();
+  const { refreshBeekeeperProfile } = useAuth();
+  const [checking, setChecking] = useState(false);
 
-  if (beekeeper.status === 'approved') {
+  // Poll for approval status updates every 3 seconds while pending
+  useEffect(() => {
+    if (beekeeper.status !== 'approved' || !beekeeper.beekeeperId) {
+      const interval = setInterval(async () => {
+        try {
+          await refreshBeekeeperProfile();
+        } catch {}
+      }, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [beekeeper.status, beekeeper.beekeeperId, refreshBeekeeperProfile]);
+
+  const handleManualCheck = async () => {
+    setChecking(true);
+    try {
+      await refreshBeekeeperProfile();
+    } finally {
+      setTimeout(() => setChecking(false), 600);
+    }
+  };
+
+  // Only display Approved screen if status is explicitly 'approved' AND has an assigned Beekeeper ID
+  if (beekeeper.status === 'approved' && beekeeper.beekeeperId) {
     return (
       <div className="max-w-2xl mx-auto p-6 md:p-8 bg-white dark:bg-slate-900 rounded-3xl border border-emerald-500/30 shadow-xl text-center">
         <div className="w-16 h-16 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -36,7 +61,7 @@ export const PendingApprovalView: React.FC<PendingApprovalViewProps> = ({
             Official Beekeeper ID
           </span>
           <div className="text-3xl font-mono font-extrabold text-amber-600 dark:text-amber-400 mt-1">
-            {beekeeper.beekeeperId || 'B001'}
+            {beekeeper.beekeeperId}
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
             State: {beekeeper.state} | District: {beekeeper.district} | Madhukranti ID: {beekeeper.madhukrantiId}
@@ -46,7 +71,7 @@ export const PendingApprovalView: React.FC<PendingApprovalViewProps> = ({
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <button
             onClick={onNavigateToHives}
-            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm shadow-md transition"
+            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm shadow-md transition cursor-pointer"
           >
             Go to My Hives & Sensors <ArrowRight className="w-4 h-4" />
           </button>
@@ -75,25 +100,25 @@ export const PendingApprovalView: React.FC<PendingApprovalViewProps> = ({
     );
   }
 
-  // Pending Status
+  // Pending Status View
   return (
     <div className="max-w-2xl mx-auto p-6 md:p-8 bg-white dark:bg-slate-900 rounded-3xl border border-amber-500/30 shadow-xl">
       <div className="flex items-center gap-4 mb-6">
         <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-          <Clock className="w-8 h-8 animate-pulse" />
+          <Clock className="w-8 h-8 animate-pulse text-amber-500" />
         </div>
         <div>
           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300">
-            {t('status.pending')}
+            Pending Admin Approval
           </span>
           <h2 className="text-xl font-bold text-slate-900 dark:text-white mt-1">
-            {t('pending.title')}
+            Your registration is pending Admin approval
           </h2>
         </div>
       </div>
 
       <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
-        {t('pending.desc')}
+        Your apiary registration details have been submitted and are currently in the Admin verification queue. Once an administrator validates your Madhukranti portal credentials, you will be assigned an official Beekeeper ID (e.g. <span className="font-mono font-bold text-amber-600 dark:text-amber-400">B045</span>) and gain access to hive registration and IoT sensors.
       </p>
 
       {/* Verification Steps Indicator */}
@@ -107,7 +132,7 @@ export const PendingApprovalView: React.FC<PendingApprovalViewProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="w-6 h-6 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center text-xs font-bold">2</div>
+          <div className="w-6 h-6 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center text-xs font-bold animate-pulse">2</div>
           <div>
             <div className="font-semibold text-slate-800 dark:text-slate-200">Madhukranti Portal Cross-Check</div>
             <div className="text-[11px] text-slate-500">Awaiting administrator verification in queue</div>
@@ -144,7 +169,7 @@ export const PendingApprovalView: React.FC<PendingApprovalViewProps> = ({
         <div>
           <span className="text-slate-500 dark:text-slate-400">Location:</span>
           <p className="font-semibold text-slate-800 dark:text-slate-200">{beekeeper.district}, {beekeeper.state}</p>
-          <p className="font-mono text-[10px] text-slate-400">GPS: {beekeeper.lat?.toFixed(4)}, {beekeeper.lng?.toFixed(4)}</p>
+          <p className="font-mono text-[10px] text-slate-400">GPS: {beekeeper.lat != null ? Number(beekeeper.lat).toFixed(4) : '26.8467'}, {beekeeper.lng != null ? Number(beekeeper.lng).toFixed(4) : '80.9462'}</p>
         </div>
         <div>
           <span className="text-slate-500 dark:text-slate-400">Total Hives Planned:</span>
@@ -152,8 +177,17 @@ export const PendingApprovalView: React.FC<PendingApprovalViewProps> = ({
         </div>
       </div>
 
-      <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-xl text-center text-xs text-slate-500">
-        Status updates automatically in real-time when the administrator reviews your application in the Approval Queue.
+      <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-500">
+        <span>Status updates automatically in real-time when approved by Admin.</span>
+        <button
+          type="button"
+          onClick={handleManualCheck}
+          disabled={checking}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition cursor-pointer disabled:opacity-50 shrink-0"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${checking ? 'animate-spin' : ''}`} />
+          <span>Check Approval Status</span>
+        </button>
       </div>
     </div>
   );

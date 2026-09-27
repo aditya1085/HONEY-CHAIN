@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { doc, setDoc, updateDoc } from 'firebase/firestore';
-import { MapPin, ShieldCheck, CheckCircle, AlertCircle, Sparkles, Navigation, Lock } from 'lucide-react';
+import { MapPin, ShieldCheck, CheckCircle, AlertCircle, Sparkles, Navigation, Lock, Clock } from 'lucide-react';
 import { db } from '../../firebase/config';
 import { handleFirestoreError, OperationType } from '../../firebase/errors';
 import { useAuth } from '../../context/AuthContext';
@@ -184,7 +184,7 @@ export const BeekeeperRegistration: React.FC<BeekeeperRegistrationProps> = ({ on
       await refreshBeekeeperProfile();
       setActiveRole('BEEKEEPER');
       setIsSuccess(true);
-      if (onSuccess) onSuccess();
+      // Keep on pending approval confirmation screen instead of immediately redirecting to hives
     } catch (err: unknown) {
       console.error('Registration failed:', err);
       const msg = err instanceof Error ? err.message : 'Registration failed. Please check your network and try again.';
@@ -196,17 +196,20 @@ export const BeekeeperRegistration: React.FC<BeekeeperRegistrationProps> = ({ on
 
   if (isSuccess) {
     return (
-      <div className="max-w-2xl mx-auto p-6 bg-white dark:bg-slate-900 rounded-2xl border border-amber-500/30 shadow-xl text-center">
+      <div className="max-w-2xl mx-auto p-6 md:p-8 bg-white dark:bg-slate-900 rounded-3xl border border-amber-500/30 shadow-xl text-center">
         <div className="w-16 h-16 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-full flex items-center justify-center mx-auto mb-4">
-          <CheckCircle className="w-9 h-9" />
+          <Clock className="w-9 h-9 animate-pulse text-amber-500" />
+        </div>
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 text-xs font-bold mb-2">
+          Pending Admin Approval
         </div>
         <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
-          {t('reg.success')}
+          Your registration is pending Admin approval
         </h3>
         <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
-          Your credentials and apiary location have been recorded and sent to the administrator queue. You will be assigned a unique Beekeeper ID (e.g. <span className="font-mono text-amber-600 dark:text-amber-400 font-semibold">B045</span>) upon review.
+          Your credentials and apiary location have been recorded and sent to the administrator queue. Your registration is currently pending Admin verification. Once an administrator approves your application, you will be assigned an official Beekeeper ID and can start registering hives.
         </p>
-        <div className="bg-amber-50 dark:bg-amber-950/40 p-4 rounded-xl text-left border border-amber-500/20 text-xs space-y-2">
+        <div className="bg-amber-50 dark:bg-amber-950/40 p-4 rounded-xl text-left border border-amber-500/20 text-xs space-y-2 mb-6">
           <div className="flex justify-between">
             <span className="text-slate-500 dark:text-slate-400">Applicant:</span>
             <span className="font-semibold text-slate-800 dark:text-slate-200">{name}</span>
@@ -220,11 +223,19 @@ export const BeekeeperRegistration: React.FC<BeekeeperRegistrationProps> = ({ on
             <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">XXXX-XXXX-{aadhaarLast4}</span>
           </div>
           <div className="flex justify-between">
+            <span className="text-slate-500 dark:text-slate-400">Location:</span>
+            <span className="font-semibold text-slate-800 dark:text-slate-200">{district}, {stateName}</span>
+          </div>
+          <div className="flex justify-between">
             <span className="text-slate-500 dark:text-slate-400">Current Status:</span>
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
-              Pending Government Verification
+              Pending Admin Approval
             </span>
           </div>
+        </div>
+
+        <div className="p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-500">
+          The administrator has been notified. You can switch to the Admin persona in the top bar to review and approve this application in the Beekeeper Approval Queue.
         </div>
       </div>
     );

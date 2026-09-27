@@ -196,13 +196,25 @@ export const LabPortal: React.FC<LabPortalProps> = ({ currentUserId, userRole })
   // Helper to merge and update hives list
   const processLabHives = (incoming: HiveRecord[]) => {
     setHives((prev) => {
-      const liveIds = new Set(incoming.map((h) => h.id || h.hiveId));
-      const combined = [
-        ...incoming,
-        ...prev.filter((h) => !liveIds.has(h.id || h.hiveId)),
-        ...SAMPLE_DATA_MASTER.hives.filter((h) => !liveIds.has(h.id || h.hiveId)),
-      ];
-      return Array.from(new Map(combined.map((h) => [h.hiveId || h.id, h])).values());
+      const byKey = new Map<string, HiveRecord>();
+      for (const h of SAMPLE_DATA_MASTER.hives) {
+        byKey.set(h.hiveId, h);
+        if (h.id) byKey.set(h.id, h);
+      }
+      for (const h of prev) {
+        byKey.set(h.hiveId, h);
+        if (h.id) byKey.set(h.id, h);
+      }
+      for (const h of incoming) {
+        byKey.set(h.hiveId, h);
+        if (h.id) byKey.set(h.id, h);
+      }
+      const uniqueMap = new Map<string, HiveRecord>();
+      for (const h of byKey.values()) {
+        const k = h.hiveId || h.id;
+        uniqueMap.set(k, h);
+      }
+      return Array.from(uniqueMap.values());
     });
   };
 
@@ -344,7 +356,27 @@ export const LabPortal: React.FC<LabPortalProps> = ({ currentUserId, userRole })
         details: `Accredited Lab certified health check for Hive ${selectedHiveForHealth.hiveId}. Verdict: ${hiveVerdict}. Notes: ${hiveVerdictNotes.trim()}`,
       });
 
-      // 5. Update local state immediately
+      // 5. Update localStorage immediately for cross-persona reactivity
+      try {
+        const localHives: HiveRecord[] = JSON.parse(localStorage.getItem('hc_local_hives') || '[]');
+        const updatedLocal = localHives.map((h) =>
+          h.hiveId === hiveId || h.id === selectedHiveForHealth.id
+            ? {
+                ...h,
+                approvalStage: 'STAGE_3_ADMIN_FINAL' as const,
+                labVerdict: hiveVerdict,
+                labVerdictNotes: hiveVerdictNotes.trim(),
+                labVerifiedBy: hiveInspector.trim(),
+                labVerifiedAt: nowIso,
+                labId: activeLab?.id || 'LAB_CBRTI_PUNE',
+                updatedAt: nowIso,
+              }
+            : h
+        );
+        localStorage.setItem('hc_local_hives', JSON.stringify(updatedLocal));
+      } catch {}
+
+      // 6. Update local state immediately
       setHives((prev) =>
         prev.map((h) =>
           h.hiveId === hiveId || h.id === selectedHiveForHealth.id
@@ -670,9 +702,9 @@ export const LabPortal: React.FC<LabPortalProps> = ({ currentUserId, userRole })
           <IndiaHivesMap role="LAB" heightClass="h-[540px]" />
         </div>
       ) : activeLabTab === 'analytics' ? (
-        <LabAnalyticsView labId={activeLab?.id} initialTab="charts" />
+        <LabAnalyticsView key="charts" labId={activeLab?.id} initialTab="charts" />
       ) : activeLabTab === 'ai_insights' ? (
-        <LabAnalyticsView labId={activeLab?.id} initialTab="ai_insights" />
+        <LabAnalyticsView key="ai_insights" labId={activeLab?.id} initialTab="ai_insights" />
       ) : activeLabTab === 'regional_search' ? (
         <StateDistrictSearch role="LAB" />
       ) : activeLabTab === 'hive_health' ? (

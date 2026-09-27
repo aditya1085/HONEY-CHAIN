@@ -3790,8 +3790,10 @@ const serverUsers: Map<string, any> = new Map();
  * Retrieve all hives (master + runtime added)
  */
 app.get('/api/hives', (_req: Request, res: Response) => {
-  const hivesList = Array.from(serverHives.values());
-  res.json({ success: true, hives: hivesList });
+  const uniqueHives = Array.from(
+    new Map(Array.from(serverHives.values()).map((h) => [h.hiveId || h.id, h])).values()
+  );
+  res.json({ success: true, hives: uniqueHives });
 });
 
 /**
