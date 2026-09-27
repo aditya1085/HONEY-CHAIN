@@ -71,9 +71,10 @@ export const AdminConsoleView: React.FC<AdminConsoleViewProps> = ({
     setActiveTab(initialSubTab);
   }, [initialSubTab]);
 
-  // Periodic counts poll
+  // Periodic counts poll for Hives & Beekeepers
   useEffect(() => {
     const fetchCounts = async () => {
+      // Hives count
       try {
         const res = await fetch('/api/hives');
         if (res.ok) {
@@ -89,10 +90,24 @@ export const AdminConsoleView: React.FC<AdminConsoleViewProps> = ({
           }
         }
       } catch {}
+
+      // Beekeepers count
+      try {
+        const res = await fetch('/api/beekeepers');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.beekeepers)) {
+            const pending = data.beekeepers.filter(
+              (b: any) => b.status?.toLowerCase() === 'pending'
+            ).length;
+            setPendingBkCount(pending);
+          }
+        }
+      } catch {}
     };
 
     fetchCounts();
-    const interval = setInterval(fetchCounts, 5000);
+    const interval = setInterval(fetchCounts, 4000);
     return () => clearInterval(interval);
   }, []);
 
@@ -114,6 +129,8 @@ export const AdminConsoleView: React.FC<AdminConsoleViewProps> = ({
       id: 'beekeepers',
       label: 'Beekeeper Queue',
       icon: ShieldCheck,
+      badge: pendingBkCount > 0 ? pendingBkCount : undefined,
+      badgeColor: 'bg-amber-500 text-slate-950',
     },
     {
       id: 'batches',

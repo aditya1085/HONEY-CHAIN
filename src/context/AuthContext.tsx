@@ -542,10 +542,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
 
       setBeekeeperProfile(pendingProfile);
+
+      // 1. Post to Backend API
+      try {
+        await fetch('/api/beekeepers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(pendingProfile),
+        });
+      } catch (apiErr) {
+        console.warn('Backend API beekeepers sync warning:', apiErr);
+      }
+
+      // 2. Save to Local Storage cache
+      try {
+        const localBks: BeekeeperProfile[] = JSON.parse(localStorage.getItem('hc_local_beekeepers') || '[]');
+        const filtered = localBks.filter((b) => b.id !== res.user.uid && b.userId !== res.user.uid);
+        filtered.unshift(pendingProfile);
+        localStorage.setItem('hc_local_beekeepers', JSON.stringify(filtered));
+      } catch (lsErr) {
+        console.warn('LocalStorage save error:', lsErr);
+      }
+
+      // 3. Save to Firestore (with resilient fallback)
       try {
         await setDoc(doc(db, 'beekeepers', res.user.uid), pendingProfile);
       } catch (bkErr) {
-        console.warn('Initial pending beekeeper doc error:', bkErr);
+        console.warn('Initial pending beekeeper doc notice:', bkErr);
       }
     }
 

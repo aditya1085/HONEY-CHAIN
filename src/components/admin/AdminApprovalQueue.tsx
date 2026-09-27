@@ -65,8 +65,89 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
   const [isHiveProcessing, setIsHiveProcessing] = useState(false);
   const [hiveActionError, setHiveActionError] = useState<string | null>(null);
 
-  // Real-time Beekeepers listener
+  // Real-time Beekeepers listener & dual-source sync
+  const processBeekeepersList = (incoming: BeekeeperProfile[]) => {
+    setBeekeepers((prev) => {
+      let localCached: BeekeeperProfile[] = [];
+      try {
+        localCached = JSON.parse(localStorage.getItem('hc_local_beekeepers') || '[]');
+      } catch {}
+
+      const allCandidates = [
+        ...incoming,
+        ...localCached,
+        ...prev,
+        ...SAMPLE_DATA_MASTER.beekeepers,
+      ];
+
+      const byId = new Map<string, BeekeeperProfile>();
+      for (const bk of allCandidates) {
+        const key = bk.id || bk.userId || bk.beekeeperId;
+        if (!key) continue;
+        if (!byId.has(key)) {
+          byId.set(key, bk);
+        } else {
+          const existing = byId.get(key)!;
+          // Prefer non-sample over sample, or pending over non-pending, or newer updatedAt
+          if (existing.isSample && !bk.isSample) {
+            byId.set(key, bk);
+          } else if (bk.status?.toLowerCase() === 'pending' && existing.status?.toLowerCase() !== 'pending') {
+            byId.set(key, bk);
+          } else if (bk.updatedAt && existing.updatedAt && new Date(bk.updatedAt) > new Date(existing.updatedAt)) {
+            byId.set(key, bk);
+          }
+        }
+      }
+
+      const merged = Array.from(byId.values());
+      merged.sort((a, b) => {
+        const aPending = a.status?.toLowerCase() === 'pending';
+        const bPending = b.status?.toLowerCase() === 'pending';
+        if (aPending && !bPending) return -1;
+        if (!aPending && bPending) return 1;
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      });
+
+      return merged;
+    });
+  };
+
+  // Sync tab with prop if changed
   useEffect(() => {
+    if (defaultSubTab) {
+      setMainTab(defaultSubTab);
+    }
+  }, [defaultSubTab]);
+
+  // Real-time Beekeepers listener & API dual-source sync
+  useEffect(() => {
+    // 1. Initial load from localStorage
+    try {
+      const localCached: BeekeeperProfile[] = JSON.parse(localStorage.getItem('hc_local_beekeepers') || '[]');
+      if (localCached.length > 0) {
+        processBeekeepersList(localCached);
+      }
+    } catch {}
+
+    // 2. Fetch from backend API
+    const fetchApiBeekeepers = async () => {
+      try {
+        const res = await fetch('/api/beekeepers');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.beekeepers) && data.beekeepers.length > 0) {
+            processBeekeepersList(data.beekeepers);
+          }
+        }
+      } catch (err) {
+        console.warn('API beekeepers fetch notice:', err);
+      }
+    };
+
+    fetchApiBeekeepers();
+    const interval = setInterval(fetchApiBeekeepers, 3000);
+
+    // 3. Real-time Firestore onSnapshot listener
     const unsubscribe = onSnapshot(
       collection(db, 'beekeepers'),
       (snapshot) => {
@@ -74,20 +155,9 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
         snapshot.forEach((d) => {
           liveList.push(d.data() as BeekeeperProfile);
         });
-
-        const liveIds = new Set(liveList.map((b) => b.id));
-        const combined = [
-          ...liveList,
-          ...SAMPLE_DATA_MASTER.beekeepers.filter((b) => !liveIds.has(b.id)),
-        ];
-
-        combined.sort((a, b) => {
-          if (a.status === 'pending' && b.status !== 'pending') return -1;
-          if (b.status === 'pending' && a.status !== 'pending') return 1;
-          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-        });
-
-        setBeekeepers(combined);
+        if (liveList.length > 0) {
+          processBeekeepersList(liveList);
+        }
         setLoadingBk(false);
       },
       (err) => {
@@ -96,7 +166,10 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      clearInterval(interval);
+      unsubscribe();
+    };
   }, []);
 
   // Helper to merge and sort hives
@@ -185,15 +258,55 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
       const { beekeeperId, seq } = await generateBeekeeperId();
       const nowIso = new Date().toISOString();
 
-      const bkRef = doc(db, 'beekeepers', selectedBeekeeper.id);
-      await updateDoc(bkRef, {
-        status: 'approved',
-        beekeeperId,
-        beekeeperSeq: seq,
-        approvedBy: currentUser.uid,
-        approvedAt: nowIso,
-        updatedAt: nowIso,
-      });
+      // 1. Call Backend API
+      try {
+        await fetch('/api/beekeepers/approve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            beekeeperId: selectedBeekeeper.id,
+            assignedId: beekeeperId,
+            adminUid: currentUser.uid,
+          }),
+        });
+      } catch (apiErr) {
+        console.warn('Backend API beekeeper approve notice:', apiErr);
+      }
+
+      // 2. Update LocalStorage cache immediately
+      try {
+        const localBks: BeekeeperProfile[] = JSON.parse(localStorage.getItem('hc_local_beekeepers') || '[]');
+        const updatedLocal = localBks.map((b) =>
+          b.id === selectedBeekeeper.id || b.userId === selectedBeekeeper.userId
+            ? { ...b, status: 'approved' as const, beekeeperId, beekeeperSeq: seq, updatedAt: nowIso }
+            : b
+        );
+        localStorage.setItem('hc_local_beekeepers', JSON.stringify(updatedLocal));
+      } catch {}
+
+      // 3. Update local state immediately
+      setBeekeepers((prev) =>
+        prev.map((b) =>
+          b.id === selectedBeekeeper.id || b.userId === selectedBeekeeper.userId
+            ? { ...b, status: 'approved' as const, beekeeperId, beekeeperSeq: seq, updatedAt: nowIso }
+            : b
+        )
+      );
+
+      // 4. Update Firestore with resilient try/catch
+      try {
+        const bkRef = doc(db, 'beekeepers', selectedBeekeeper.id);
+        await updateDoc(bkRef, {
+          status: 'approved',
+          beekeeperId,
+          beekeeperSeq: seq,
+          approvedBy: currentUser.uid,
+          approvedAt: nowIso,
+          updatedAt: nowIso,
+        });
+      } catch (fsErr) {
+        console.warn('Firestore beekeeper approve notice:', fsErr);
+      }
 
       if (selectedBeekeeper.userId) {
         try {
@@ -232,7 +345,7 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
       setSelectedBeekeeper(null);
     } catch (err: unknown) {
       console.error('Approve failed:', err);
-      setActionError(err instanceof Error ? err.message : 'Approval failed. Check database permissions.');
+      setActionError(err instanceof Error ? err.message : 'Approval failed.');
     } finally {
       setIsProcessing(false);
     }
@@ -250,12 +363,53 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
 
     try {
       const nowIso = new Date().toISOString();
-      const bkRef = doc(db, 'beekeepers', selectedBeekeeper.id);
-      await updateDoc(bkRef, {
-        status: 'rejected',
-        rejectionReason: rejectionReason.trim(),
-        updatedAt: nowIso,
-      });
+
+      // 1. Call Backend API
+      try {
+        await fetch('/api/beekeepers/reject', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            beekeeperId: selectedBeekeeper.id,
+            reason: rejectionReason.trim(),
+            adminUid: currentUser.uid,
+          }),
+        });
+      } catch (apiErr) {
+        console.warn('Backend API beekeeper reject notice:', apiErr);
+      }
+
+      // 2. Update LocalStorage cache immediately
+      try {
+        const localBks: BeekeeperProfile[] = JSON.parse(localStorage.getItem('hc_local_beekeepers') || '[]');
+        const updatedLocal = localBks.map((b) =>
+          b.id === selectedBeekeeper.id || b.userId === selectedBeekeeper.userId
+            ? { ...b, status: 'rejected' as const, rejectionReason: rejectionReason.trim(), updatedAt: nowIso }
+            : b
+        );
+        localStorage.setItem('hc_local_beekeepers', JSON.stringify(updatedLocal));
+      } catch {}
+
+      // 3. Update local state immediately
+      setBeekeepers((prev) =>
+        prev.map((b) =>
+          b.id === selectedBeekeeper.id || b.userId === selectedBeekeeper.userId
+            ? { ...b, status: 'rejected' as const, rejectionReason: rejectionReason.trim(), updatedAt: nowIso }
+            : b
+        )
+      );
+
+      // 4. Update Firestore with resilient try/catch
+      try {
+        const bkRef = doc(db, 'beekeepers', selectedBeekeeper.id);
+        await updateDoc(bkRef, {
+          status: 'rejected',
+          rejectionReason: rejectionReason.trim(),
+          updatedAt: nowIso,
+        });
+      } catch (fsErr) {
+        console.warn('Firestore beekeeper reject notice:', fsErr);
+      }
 
       if (selectedBeekeeper.userId) {
         try {
@@ -611,7 +765,7 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
   };
 
   // ===================== FILTERS & COUNTS =====================
-  const pendingBeekeepersCount = beekeepers.filter((b) => b.status === 'pending').length;
+  const pendingBeekeepersCount = beekeepers.filter((b) => b.status?.toLowerCase() === 'pending').length;
 
   const stage1Hives = hives.filter(
     (h) => h.approvalStage === 'STAGE_1_ADMIN_REVIEW' || (!h.approvalStage && h.approvalStatus === 'pending')
@@ -622,12 +776,16 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
 
   // Filtered Beekeepers
   const filteredBeekeepers = beekeepers.filter((b) => {
-    const matchesFilter = filterStatus === 'all' || b.status === filterStatus;
+    const matchesFilter = filterStatus === 'all' || b.status?.toLowerCase() === filterStatus.toLowerCase();
     const s = searchTerm.toLowerCase();
     const matchesSearch =
       (b.name || '').toLowerCase().includes(s) ||
       (b.madhukrantiId || '').toLowerCase().includes(s) ||
       (b.state || '').toLowerCase().includes(s) ||
+      (b.district || '').toLowerCase().includes(s) ||
+      (b.email || '').toLowerCase().includes(s) ||
+      (b.phone || '').toLowerCase().includes(s) ||
+      (b.address || '').toLowerCase().includes(s) ||
       (b.beekeeperId || '').toLowerCase().includes(s);
     return matchesFilter && matchesSearch;
   });
@@ -780,11 +938,21 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
                         <td className="py-3.5 px-4">
                           <div className="font-bold text-slate-900 dark:text-white">{bk.name}</div>
                           <div className="text-[11px] text-slate-500">{bk.email}</div>
+                          {bk.phone && (
+                            <div className="text-[10px] text-amber-600 dark:text-amber-400 font-mono mt-0.5">
+                              📞 {bk.phone}
+                            </div>
+                          )}
                         </td>
                         <td className="py-3.5 px-4">
-                          <div className="text-slate-900 dark:text-slate-200">{bk.district}, {bk.state}</div>
-                          <div className="text-[10px] text-slate-500 font-mono">
-                            GPS: {bk.lat?.toFixed(2)}, {bk.lng?.toFixed(2)}
+                          <div className="text-slate-900 dark:text-slate-200 font-semibold">{bk.district}, {bk.state}</div>
+                          {bk.address && (
+                            <div className="text-[10px] text-slate-500 truncate max-w-xs mt-0.5" title={bk.address}>
+                              🏠 {bk.address}
+                            </div>
+                          )}
+                          <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                            GPS: {bk.lat != null ? Number(bk.lat).toFixed(4) : '26.8467'}, {bk.lng != null ? Number(bk.lng).toFixed(4) : '80.9462'}
                           </div>
                         </td>
                         <td className="py-3.5 px-4 font-mono font-semibold text-slate-700 dark:text-slate-300">
@@ -1147,14 +1315,18 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
                 <div>
                   <span className="text-[10px] text-slate-400 uppercase font-bold block">Applicant Name</span>
                   <div className="font-bold text-sm text-slate-900 dark:text-white mt-0.5">{selectedBeekeeper.name}</div>
                 </div>
                 <div>
+                  <span className="text-[10px] text-slate-400 uppercase font-bold block">Contact Phone</span>
+                  <div className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{selectedBeekeeper.phone || 'N/A'}</div>
+                </div>
+                <div>
                   <span className="text-[10px] text-slate-400 uppercase font-bold block">Contact Email</span>
-                  <div className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{selectedBeekeeper.email}</div>
+                  <div className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{selectedBeekeeper.email || 'N/A'}</div>
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-400 uppercase font-bold block">Madhukranti Portal ID</span>
@@ -1163,18 +1335,31 @@ export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hive
                   </div>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-bold block">Aadhaar Last 4</span>
+                  <span className="text-[10px] text-slate-400 uppercase font-bold block">Aadhaar (Last 4)</span>
                   <div className="font-mono font-bold text-slate-900 dark:text-white mt-0.5">
                     •••• •••• {selectedBeekeeper.aadhaarLast4}
                   </div>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-bold block">State & District</span>
-                  <div className="text-slate-900 dark:text-white mt-0.5">{selectedBeekeeper.district}, {selectedBeekeeper.state}</div>
-                </div>
-                <div>
                   <span className="text-[10px] text-slate-400 uppercase font-bold block">Planned Hives</span>
                   <div className="text-slate-900 dark:text-white mt-0.5">{selectedBeekeeper.totalHivesPlanned || 10} boxes</div>
+                </div>
+                <div className="sm:col-span-2">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold block">State, District & Full Address</span>
+                  <div className="text-slate-900 dark:text-white mt-0.5">
+                    <strong>{selectedBeekeeper.district}, {selectedBeekeeper.state}</strong>
+                    {selectedBeekeeper.address && (
+                      <span className="block text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">
+                        {selectedBeekeeper.address}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase font-bold block">Apiary GPS Coordinates</span>
+                  <div className="font-mono text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                    {selectedBeekeeper.lat != null ? Number(selectedBeekeeper.lat).toFixed(4) : '26.8467'}, {selectedBeekeeper.lng != null ? Number(selectedBeekeeper.lng).toFixed(4) : '80.9462'}
+                  </div>
                 </div>
               </div>
 

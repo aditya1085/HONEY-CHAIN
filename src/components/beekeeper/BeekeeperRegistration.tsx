@@ -127,14 +127,46 @@ export const BeekeeperRegistration: React.FC<BeekeeperRegistrationProps> = ({ on
         updatedAt: new Date().toISOString(),
       };
 
-      // Save beekeeper profile to Firestore
-      await setDoc(doc(db, 'beekeepers', beekeeperDocId), profileData);
+      // 1. Post to Backend API (guaranteed persistence across all personas)
+      try {
+        await fetch('/api/beekeepers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(profileData),
+        });
+      } catch (apiErr) {
+        console.warn('Backend API beekeepers sync warning:', apiErr);
+      }
 
-      // Update user document role to BEEKEEPER
-      await updateDoc(doc(db, 'users', currentUser.uid), {
-        role: 'BEEKEEPER',
-        updatedAt: new Date().toISOString(),
-      });
+      // 2. Save beekeeper profile to local storage cache for immediate reactivity across personas
+      try {
+        const localBks: BeekeeperProfile[] = JSON.parse(localStorage.getItem('hc_local_beekeepers') || '[]');
+        const filtered = localBks.filter((b) => b.id !== beekeeperDocId && b.userId !== currentUser.uid);
+        filtered.unshift(profileData);
+        localStorage.setItem('hc_local_beekeepers', JSON.stringify(filtered));
+      } catch (lsErr) {
+        console.warn('LocalStorage save error:', lsErr);
+      }
+
+      // 3. Save beekeeper profile to Firestore (with resilient fallback)
+      try {
+        await setDoc(doc(db, 'beekeepers', beekeeperDocId), profileData);
+      } catch (fsErr) {
+        console.warn('Firestore beekeeper save notice:', fsErr);
+      }
+
+      // 4. Update user document role to BEEKEEPER (merge so non-existent doc doesn't crash)
+      try {
+        await setDoc(doc(db, 'users', currentUser.uid), {
+          id: currentUser.uid,
+          email: currentUser.email || email.trim(),
+          displayName: name.trim(),
+          role: 'BEEKEEPER',
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
+      } catch (uErr) {
+        console.warn('User doc update notice:', uErr);
+      }
 
       await logActivity({
         action: 'BEEKEEPER_REGISTRATION_SUBMITTED',

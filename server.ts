@@ -4274,10 +4274,100 @@ app.post('/api/hives/:hiveId/final-reject', async (req: Request, res: Response) 
 
 /**
  * GET /api/beekeepers
- * Retrieve all registered beekeepers
+ * Retrieve all registered beekeepers (combining in-memory and Firestore)
  */
-app.get('/api/beekeepers', (_req: Request, res: Response) => {
-  res.json({ success: true, beekeepers: Array.from(serverBeekeepers.values()) });
+app.get('/api/beekeepers', async (_req: Request, res: Response) => {
+  try {
+    try {
+      const snap = await safeFsQuery(() => getDocs(collection(db, 'beekeepers')), 800);
+      if (snap && !snap.empty) {
+        snap.forEach((d) => {
+          const data = d.data();
+          if (data && (data.id || d.id)) {
+            const docId = data.id || d.id;
+            const existing = serverBeekeepers.get(docId) || {};
+            serverBeekeepers.set(docId, { ...existing, ...data });
+          }
+        });
+      }
+    } catch {}
+    res.json({ success: true, beekeepers: Array.from(serverBeekeepers.values()) });
+  } catch (err) {
+    res.json({ success: true, beekeepers: Array.from(serverBeekeepers.values()) });
+  }
+});
+
+/**
+ * POST /api/beekeepers
+ * Register a new beekeeper (Stage 1: Pending Admin Verification)
+ */
+app.post('/api/beekeepers', async (req: Request, res: Response) => {
+  try {
+    const bk = req.body;
+    if (!bk || !bk.name) {
+      res.status(400).json({ error: 'Beekeeper name is required' });
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const docId = bk.id || bk.userId || `BK_${Date.now()}`;
+    const normalizedBk = {
+      ...bk,
+      id: docId,
+      userId: bk.userId || docId,
+      status: bk.status || 'pending',
+      createdAt: bk.createdAt || nowIso,
+      updatedAt: nowIso,
+    };
+
+    serverBeekeepers.set(docId, normalizedBk);
+    if (normalizedBk.beekeeperId) {
+      serverBeekeepers.set(normalizedBk.beekeeperId, normalizedBk);
+    }
+    if (normalizedBk.userId && normalizedBk.userId !== docId) {
+      serverBeekeepers.set(normalizedBk.userId, normalizedBk);
+    }
+
+    // Also update serverUsers if exists
+    if (serverUsers.has(normalizedBk.userId)) {
+      const u = serverUsers.get(normalizedBk.userId);
+      serverUsers.set(normalizedBk.userId, { ...u, role: 'BEEKEEPER' });
+    }
+
+    // Create notification for Admin
+    serverNotifications.unshift({
+      id: `notif_admin_${Date.now()}`,
+      userId: 'admin',
+      title: '👤 New Beekeeper Registration Pending',
+      message: `${normalizedBk.name} (${normalizedBk.state || 'India'}, ${normalizedBk.district || ''}) submitted an apiary registration with Madhukranti ID ${normalizedBk.madhukrantiId || 'Pending'}. Review required in Beekeeper Approval Queue.`,
+      type: 'INFO',
+      read: false,
+      createdAt: nowIso,
+    });
+
+    // Log Activity
+    serverActivityLogs.unshift({
+      id: `log_${Date.now()}`,
+      action: 'BEEKEEPER_REGISTRATION_SUBMITTED',
+      entityType: 'BEEKEEPER',
+      entityId: docId,
+      details: `New Beekeeper registration submitted: ${normalizedBk.name} (${normalizedBk.state}, ${normalizedBk.district})`,
+      actorRole: 'BEEKEEPER',
+      timestamp: nowIso,
+    });
+
+    // Background Firestore attempt
+    try {
+      await setDoc(doc(db, 'beekeepers', docId), normalizedBk, { merge: true });
+    } catch (fsErr) {
+      console.warn('Background Firestore beekeeper sync note:', fsErr);
+    }
+
+    res.status(201).json({ success: true, beekeeper: normalizedBk });
+  } catch (err) {
+    console.error('Add beekeeper error:', err);
+    res.status(500).json({ error: 'Failed to record beekeeper', details: String(err) });
+  }
 });
 
 /**
@@ -4316,6 +4406,7 @@ app.post('/api/beekeepers/approve', async (req: Request, res: Response) => {
 
     serverBeekeepers.set(beekeeper.id || bkDocId, updated);
     if (beekeeper.beekeeperId) serverBeekeepers.set(beekeeper.beekeeperId, updated);
+    if (finalId) serverBeekeepers.set(finalId, updated);
 
     // Notify Beekeeper
     serverNotifications.unshift({
@@ -4339,9 +4430,94 @@ app.post('/api/beekeepers/approve', async (req: Request, res: Response) => {
       timestamp: nowIso,
     });
 
+    // Background Firestore update
+    try {
+      await updateDoc(doc(db, 'beekeepers', beekeeper.id || bkDocId), {
+        status: 'approved',
+        beekeeperId: finalId,
+        approvedBy: adminUid || 'admin',
+        approvedAt: nowIso,
+        updatedAt: nowIso,
+      });
+    } catch {}
+
     res.json({ success: true, beekeeper: updated });
   } catch (err) {
     res.status(500).json({ error: 'Failed to approve beekeeper', details: String(err) });
+  }
+});
+
+/**
+ * POST /api/beekeepers/reject
+ * Admin rejects a beekeeper registration
+ */
+app.post('/api/beekeepers/reject', async (req: Request, res: Response) => {
+  try {
+    const { beekeeperId: bkDocId, reason, adminUid } = req.body;
+    let beekeeper = serverBeekeepers.get(bkDocId);
+    if (!beekeeper) {
+      for (const b of serverBeekeepers.values()) {
+        if (b.id === bkDocId || b.userId === bkDocId || b.beekeeperId === bkDocId) {
+          beekeeper = b;
+          break;
+        }
+      }
+    }
+
+    if (!beekeeper) {
+      res.status(404).json({ error: 'Beekeeper not found' });
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const updated = {
+      ...beekeeper,
+      status: 'rejected',
+      rejectionReason: reason || 'Registration details could not be verified.',
+      rejectedBy: adminUid || 'admin',
+      rejectedAt: nowIso,
+      updatedAt: nowIso,
+    };
+
+    serverBeekeepers.set(beekeeper.id || bkDocId, updated);
+    if (beekeeper.beekeeperId) serverBeekeepers.set(beekeeper.beekeeperId, updated);
+
+    // Notify Beekeeper
+    serverNotifications.unshift({
+      id: `notif_bk_${Date.now()}`,
+      userId: beekeeper.userId || beekeeper.id,
+      title: '⚠️ Apiary Registration Status Update',
+      message: `Your registration could not be verified at this time. Reason: ${reason}`,
+      type: 'ALERT',
+      read: false,
+      createdAt: nowIso,
+    });
+
+    // Log Activity
+    serverActivityLogs.unshift({
+      id: `log_${Date.now()}`,
+      action: 'BEEKEEPER_REJECTED',
+      entityType: 'BEEKEEPER',
+      entityId: beekeeper.id || bkDocId,
+      details: `Rejected beekeeper ${beekeeper.name}. Reason: ${reason}`,
+      actorRole: 'ADMIN',
+      timestamp: nowIso,
+    });
+
+    // Background Firestore update
+    try {
+      await updateDoc(doc(db, 'beekeepers', beekeeper.id || bkDocId), {
+        status: 'rejected',
+        rejectionReason: reason || 'Registration details could not be verified.',
+        rejectedBy: adminUid || 'admin',
+        rejectedAt: nowIso,
+        updatedAt: nowIso,
+      });
+    } catch {}
+
+    res.json({ success: true, beekeeper: updated });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to reject beekeeper', details: String(err) });
   }
 });
 
