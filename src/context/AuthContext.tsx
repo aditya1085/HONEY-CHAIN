@@ -34,6 +34,7 @@ interface AuthContextType {
   loading: boolean;
   activeRole: UserRole;
   setActiveRole: (role: UserRole) => void;
+  loginAsPersona: (role: UserRole) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, pass: string, intendedRole?: UserRole) => Promise<void>;
   signUpWithEmail: (
@@ -56,6 +57,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   activeRole: 'CONSUMER',
   setActiveRole: () => {},
+  loginAsPersona: async () => {},
   signInWithGoogle: async () => {},
   signInWithEmail: async () => {},
   signUpWithEmail: async () => {},
@@ -144,11 +146,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       let currentRole: UserRole = 'CONSUMER';
-      if (isSuperAdmin) {
+      if (cleanEmail === 'admin.honeychain@gmail.com' || isSuperAdmin) {
         currentRole = 'ADMIN';
-      } else if (isLabEmail) {
+      } else if (cleanEmail === 'lab.demo@honeychain.in' || isLabEmail) {
         currentRole = 'LAB';
-      } else if (hasBeekeeperDoc) {
+      } else if (cleanEmail === 'beekeeper.demo@honeychain.in' || hasBeekeeperDoc) {
         currentRole = 'BEEKEEPER';
       } else if (userSnap.exists() && userSnap.data().role) {
         currentRole = userSnap.data().role;
@@ -158,6 +160,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentRole = pendingSigninRole;
       } else if (savedUserRole) {
         currentRole = savedUserRole;
+      }
+
+      // For Beekeeper persona: ensure approved profile exists with ID B001
+      if (cleanEmail === 'beekeeper.demo@honeychain.in' && (!hasBeekeeperDoc || beekeeperProfile?.status !== 'approved')) {
+        const approvedBk: BeekeeperProfile = {
+          id: fbUser.uid,
+          userId: fbUser.uid,
+          beekeeperId: 'B001',
+          name: 'Sita Ram (Beekeeper)',
+          email: cleanEmail,
+          phone: '+91 98765 43210',
+          state: 'Uttar Pradesh',
+          district: 'Lucknow',
+          address: 'Plot 42, Bee Corridor, Mohanlalganj, Lucknow',
+          lat: 26.8467,
+          lng: 80.9462,
+          aadhaarLast4: '1234',
+          aadhaarHash: 'c7be8f5619b02a2498dbca204f14e59178ad54911d7fc49116e036df52b0c169',
+          madhukrantiId: 'NBB/UP/2026/0123',
+          totalHivesPlanned: 20,
+          status: 'approved',
+          trustScore: 98,
+          isSample: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        setBeekeeperProfile(approvedBk);
+        try {
+          await setDoc(doc(db, 'beekeepers', fbUser.uid), approvedBk, { merge: true });
+        } catch {}
       }
 
       if (userSnap.exists()) {
@@ -174,9 +206,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else if (currentRole === 'BEEKEEPER' && data.role !== 'BEEKEEPER' && data.role !== 'ADMIN') {
           // Keep Firestore user doc in sync with Beekeeper role
           try {
-            await updateDoc(userRef, { role: 'BEEKEEPER', updatedAt: new Date().toISOString() });
+            await updateDoc(userRef, { role: 'BEEKEEPER', beekeeperId: 'B001', updatedAt: new Date().toISOString() });
           } catch {}
           data.role = 'BEEKEEPER';
+          data.beekeeperId = 'B001';
+        } else if (currentRole === 'LAB' && data.role !== 'LAB') {
+          try {
+            await updateDoc(userRef, { role: 'LAB', labId: 'LAB_CBRTI_PUNE', updatedAt: new Date().toISOString() });
+          } catch {}
+          data.role = 'LAB';
+          data.labId = 'LAB_CBRTI_PUNE';
         } else if (!isSuperAdmin && !isLabEmail && !hasBeekeeperDoc && data.role) {
           currentRole = data.role;
         }
@@ -194,18 +233,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const newProfile: UserProfile = {
           id: fbUser.uid,
           email: fbUser.email || '',
-          displayName: fbUser.displayName || fbUser.email?.split('@')[0] || 'Honey User',
+          displayName:
+            initialRole === 'ADMIN'
+              ? 'Aditya Tripathi (Admin)'
+              : initialRole === 'BEEKEEPER'
+              ? 'Sita Ram (Beekeeper)'
+              : initialRole === 'LAB'
+              ? 'NABL Central Quality Laboratory'
+              : fbUser.displayName || fbUser.email?.split('@')[0] || 'Honey User',
           role: initialRole,
+          beekeeperId: initialRole === 'BEEKEEPER' ? 'B001' : undefined,
+          labId: initialRole === 'LAB' ? 'LAB_CBRTI_PUNE' : undefined,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
-        await setDoc(userRef, newProfile);
-        if (isSuperAdmin) {
-          await setDoc(doc(db, 'admins', fbUser.uid), {
-            uid: fbUser.uid,
-            email: fbUser.email,
-            createdAt: new Date().toISOString(),
-          });
+        try {
+          await setDoc(userRef, newProfile);
+        } catch {}
+        if (isSuperAdmin || initialRole === 'ADMIN') {
+          try {
+            await setDoc(doc(db, 'admins', fbUser.uid), {
+              uid: fbUser.uid,
+              email: fbUser.email,
+              createdAt: new Date().toISOString(),
+            });
+          } catch {}
         }
         setUserProfile(newProfile);
         setActiveRole(initialRole);
@@ -262,11 +314,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const fallbackProfile: UserProfile = {
         id: fbUser.uid,
         email: fbUser.email || '',
-        displayName: fbUser.displayName || fbUser.email?.split('@')[0] || 'Honey User',
+        displayName:
+          resolvedRole === 'ADMIN'
+            ? 'Aditya Tripathi (Admin)'
+            : resolvedRole === 'BEEKEEPER'
+            ? 'Sita Ram (Beekeeper)'
+            : resolvedRole === 'LAB'
+            ? 'NABL Central Quality Laboratory'
+            : fbUser.displayName || fbUser.email?.split('@')[0] || 'Arjun Sharma',
         role: resolvedRole,
+        beekeeperId: resolvedRole === 'BEEKEEPER' ? 'B001' : undefined,
+        labId: resolvedRole === 'LAB' ? 'LAB_CBRTI_PUNE' : undefined,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
+
+      if (resolvedRole === 'BEEKEEPER') {
+        const bkData: BeekeeperProfile = {
+          id: fbUser.uid,
+          userId: fbUser.uid,
+          beekeeperId: 'B001',
+          name: 'Sita Ram (Beekeeper)',
+          email: fbUser.email || 'beekeeper.demo@honeychain.in',
+          phone: '+91 98765 43210',
+          state: 'Uttar Pradesh',
+          district: 'Lucknow',
+          address: 'Plot 42, Bee Corridor, Mohanlalganj, Lucknow',
+          lat: 26.8467,
+          lng: 80.9462,
+          aadhaarLast4: '1234',
+          aadhaarHash: 'c7be8f5619b02a2498dbca204f14e59178ad54911d7fc49116e036df52b0c169',
+          madhukrantiId: 'NBB/UP/2026/0123',
+          totalHivesPlanned: 20,
+          status: 'approved',
+          trustScore: 98,
+          isSample: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        setBeekeeperProfile(bkData);
+      }
+
       setUserProfile(fallbackProfile);
       setActiveRole(resolvedRole);
     }
@@ -541,6 +629,99 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginAsPersona = async (personaRole: UserRole) => {
+    setLoading(true);
+    cleanupBkListener();
+
+    // 1. Wipe caches to ensure clean distinct sessions
+    try {
+      localStorage.removeItem('hc_cached_user');
+      localStorage.removeItem('hc_role');
+      localStorage.removeItem('hc_session');
+    } catch {}
+
+    // 2. Clear Firebase Auth session first
+    try {
+      await fbSignOut(auth);
+    } catch {}
+
+    // 3. Credentials for the 4 real persona accounts
+    const creds: Record<UserRole, { email: string; pass: string; name: string }> = {
+      ADMIN: {
+        email: 'admin.honeychain@gmail.com',
+        pass: 'AdminPass123!',
+        name: 'Aditya Tripathi (Admin)',
+      },
+      BEEKEEPER: {
+        email: 'beekeeper.demo@honeychain.in',
+        pass: 'Demo1234!',
+        name: 'Sita Ram (Beekeeper)',
+      },
+      LAB: {
+        email: 'lab.demo@honeychain.in',
+        pass: 'Demo1234!',
+        name: 'NABL Central Quality Laboratory',
+      },
+      CONSUMER: {
+        email: 'consumer.demo@honeychain.in',
+        pass: 'Demo1234!',
+        name: 'Arjun Sharma',
+      },
+    };
+
+    const target = creds[personaRole];
+    let userCred: any = null;
+
+    try {
+      userCred = await signInWithEmailAndPassword(auth, target.email, target.pass);
+    } catch (err: any) {
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+        userCred = await createUserWithEmailAndPassword(auth, target.email, target.pass);
+      } else {
+        throw err;
+      }
+    }
+
+    if (userCred?.user) {
+      const fbUser = userCred.user;
+      setCurrentUser(fbUser);
+
+      // Call server persona profile sync
+      try {
+        const resp = await fetch('/api/auth/persona-profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            role: personaRole,
+            uid: fbUser.uid,
+            email: target.email,
+          }),
+        });
+        const profileData = await resp.json();
+        if (profileData?.userProfile) {
+          setUserProfile(profileData.userProfile);
+          setActiveRole(profileData.userProfile.role || personaRole);
+        }
+        if (profileData?.beekeeperProfile) {
+          setBeekeeperProfile(profileData.beekeeperProfile);
+        }
+      } catch {}
+
+      await syncUserData(fbUser);
+
+      try {
+        await logActivity({
+          action: 'PERSONA_LOGIN',
+          entityType: 'SYSTEM',
+          entityId: fbUser.uid,
+          details: `Switched session to verified ${personaRole} persona (${target.email})`,
+          actorRole: personaRole,
+        });
+      } catch {}
+    }
+    setLoading(false);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -550,6 +731,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         activeRole,
         setActiveRole: handleSetActiveRole,
+        loginAsPersona,
         signInWithGoogle,
         signInWithEmail,
         signUpWithEmail,

@@ -36,6 +36,7 @@ import { MarketplaceModeration } from './components/admin/MarketplaceModeration'
 import { UserManagementView } from './components/admin/UserManagementView';
 import { PlatformSettingsView } from './components/admin/PlatformSettingsView';
 import { AdminDataManager } from './components/admin/AdminDataManager';
+import { AdminConsoleView } from './components/admin/AdminConsoleView';
 import { StateDistrictSearch } from './components/common/StateDistrictSearch';
 import { ConsumerAnalyticsView } from './components/consumer/ConsumerAnalyticsView';
 import { ConsumerMapView } from './components/consumer/ConsumerMapView';
@@ -107,7 +108,7 @@ const MainContent: React.FC = () => {
       if (routingKey !== lastRoutedKeyRef.current) {
         lastRoutedKeyRef.current = routingKey;
         if (activeRole === 'ADMIN') {
-          setCurrentTab('admin-analytics');
+          setCurrentTab('admin-console');
         } else if (activeRole === 'BEEKEEPER') {
           setCurrentTab('beekeeper-dashboard');
         } else if (activeRole === 'LAB') {
@@ -123,6 +124,7 @@ const MainContent: React.FC = () => {
 
   // Role Access Checks & Restrictions
   const ADMIN_ONLY_TABS = [
+    'admin-console',
     'admin-queue',
     'admin-analytics',
     'admin-moderation',
@@ -481,27 +483,81 @@ const MainContent: React.FC = () => {
           />
         )}
 
+        {currentTab === 'admin-console' && (
+          <AdminConsoleView
+            initialSubTab="hives-queue"
+            onNavigateTab={(t) => setCurrentTab(t)}
+          />
+        )}
+
+        {currentTab === 'admin-queue' && (
+          <AdminConsoleView
+            initialSubTab="hives-queue"
+            onNavigateTab={(t) => setCurrentTab(t)}
+          />
+        )}
+
+        {currentTab === 'admin-analytics' && (
+          <AdminConsoleView
+            initialSubTab="analytics"
+            onNavigateTab={(t) => setCurrentTab(t)}
+          />
+        )}
+
+        {currentTab === 'admin-data' && (
+          <AdminConsoleView
+            initialSubTab="data-manager"
+            onNavigateTab={(t) => setCurrentTab(t)}
+          />
+        )}
+
+        {currentTab === 'admin-hives' && (
+          <AdminConsoleView
+            initialSubTab="hives-fleet"
+            onNavigateTab={(t) => setCurrentTab(t)}
+          />
+        )}
+
+        {currentTab === 'admin-users' && (
+          <AdminConsoleView
+            initialSubTab="users"
+            onNavigateTab={(t) => setCurrentTab(t)}
+          />
+        )}
+
+        {currentTab === 'admin-settings' && (
+          <AdminConsoleView
+            initialSubTab="settings"
+            onNavigateTab={(t) => setCurrentTab(t)}
+          />
+        )}
+
+        {currentTab === 'admin-moderation' && (
+          <AdminConsoleView
+            initialSubTab="moderation"
+            onNavigateTab={(t) => setCurrentTab(t)}
+          />
+        )}
+
+        {currentTab === 'payouts' && (
+          <AdminConsoleView
+            initialSubTab="payouts"
+            onNavigateTab={(t) => setCurrentTab(t)}
+          />
+        )}
+
+        {currentTab === 'activity-logs' && (
+          <AdminConsoleView
+            initialSubTab="activity-logs"
+            onNavigateTab={(t) => setCurrentTab(t)}
+          />
+        )}
+
         {currentTab === 'ledger-explorer' && <LedgerExplorer />}
 
         {currentTab === 'species-thresholds' && <SpeciesThresholdsEditor />}
 
-        {currentTab === 'admin-hives' && <AdminHivesManagement />}
-
         {currentTab === 'api-docs' && <ApiDocsView />}
-
-        {currentTab === 'admin-queue' && <AdminApprovalQueue />}
-
-        {currentTab === 'admin-analytics' && <AdminAnalyticsView />}
-
-        {currentTab === 'admin-moderation' && <MarketplaceModeration />}
-
-        {currentTab === 'admin-users' && <UserManagementView />}
-
-        {currentTab === 'admin-settings' && <PlatformSettingsView />}
-
-        {currentTab === 'admin-data' && <AdminDataManager />}
-
-        {currentTab === 'activity-logs' && <ActivityLogViewer />}
 
         {currentTab === 'id-engine' && <IdGeneratorsTest />}
 

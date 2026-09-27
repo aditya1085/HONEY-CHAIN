@@ -32,7 +32,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onClose,
   initialMode = 'signin',
 }) => {
-  const { signInWithGoogle, signInWithEmail, signUpWithEmail } = useAuth();
+  const { signInWithGoogle, signInWithEmail, signUpWithEmail, loginAsPersona } = useAuth();
   const { t } = useLanguage();
 
   const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
@@ -180,22 +180,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  // Demo accounts for effortless evaluation using real Firebase Auth
+  // Demo accounts for effortless evaluation using real Firebase Auth and real Firestore user docs
   const quickDemoLogin = async (demoEmail: string, demoPass: string, demoName: string, demoRole: UserRole) => {
     setErrorMsg(null);
     setIsOperationNotAllowed(false);
     setLoading(true);
     try {
-      try {
-        await signInWithEmail(demoEmail, demoPass);
-      } catch (authErr: any) {
-        // If demo user does not exist in Firebase Auth yet, auto-create real user in new project
-        try {
-          await signUpWithEmail(demoEmail, demoPass, demoName, demoRole);
-        } catch (createErr: any) {
-          throw createErr;
-        }
-      }
+      await loginAsPersona(demoRole);
       onClose();
     } catch (e: unknown) {
       console.warn('Demo login notice:', e);

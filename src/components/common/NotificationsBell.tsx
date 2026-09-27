@@ -42,6 +42,31 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({
   const [isOpen, setIsOpen] = useState<boolean>(false);
 
   useEffect(() => {
+    const fetchApiNotifs = async () => {
+      try {
+        const res = await fetch(`/api/notifications?userId=${encodeURIComponent(effectiveUserId || 'admin')}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.notifications)) {
+            setNotifications((prev) => {
+              const liveIds = new Set(data.notifications.map((n: NotificationRecord) => n.id));
+              const combined = [
+                ...data.notifications,
+                ...prev.filter((n) => !liveIds.has(n.id)),
+              ];
+              combined.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+              return combined;
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('API notifications fetch note:', e);
+      }
+    };
+
+    fetchApiNotifs();
+    const interval = setInterval(fetchApiNotifs, 3000);
+
     // Listen to notifications
     const q = collection(db, 'notifications');
     const unsubscribe = onSnapshot(
@@ -55,14 +80,25 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({
         userNotifs.sort(
           (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
-        setNotifications(userNotifs);
+        setNotifications((prev) => {
+          const liveIds = new Set(userNotifs.map((n) => n.id));
+          const combined = [
+            ...userNotifs,
+            ...prev.filter((n) => !liveIds.has(n.id)),
+          ];
+          combined.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+          return combined;
+        });
       },
       (err) => {
         console.warn('Notifications listener error:', err);
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      clearInterval(interval);
+      unsubscribe();
+    };
   }, [effectiveUserId, userEmail]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;

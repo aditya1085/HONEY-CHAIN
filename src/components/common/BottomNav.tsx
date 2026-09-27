@@ -34,14 +34,14 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       {/* Role-specific Hub: Admin, Lab, Beekeeper, or Consumer */}
       {activeRole === 'ADMIN' ? (
         <button
-          onClick={() => setCurrentTab('admin-analytics')}
+          onClick={() => setCurrentTab('admin-console')}
           className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition ${
             currentTab.startsWith('admin')
               ? 'text-amber-600 dark:text-amber-400 font-bold'
               : 'text-slate-500 dark:text-slate-400'
           }`}
         >
-          <TrendingUp className="w-5 h-5" />
+          <ShieldCheck className="w-5 h-5" />
           <span className="text-[10px]">{t('role.admin')}</span>
         </button>
       ) : activeRole === 'LAB' ? (

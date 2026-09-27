@@ -59,6 +59,34 @@ export const MyHivesView: React.FC = () => {
   const [stickerHive, setStickerHive] = useState<HiveRecord | null>(null);
 
   useEffect(() => {
+    const fetchApiHives = async () => {
+      try {
+        const res = await fetch('/api/hives');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.hives)) {
+            const myApiHives = data.hives.filter((h: HiveRecord) => h.beekeeperId === bkId || (!h.beekeeperId && bkId === 'B001'));
+            if (myApiHives.length > 0) {
+              setHives((prev) => {
+                const liveIds = new Set(myApiHives.map((h: HiveRecord) => h.hiveId || h.id));
+                const combined = [
+                  ...myApiHives,
+                  ...prev.filter((h) => !liveIds.has(h.hiveId || h.id)),
+                ];
+                combined.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+                return combined;
+              });
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('API hives fetch note in MyHivesView:', e);
+      }
+    };
+
+    fetchApiHives();
+    const interval = setInterval(fetchApiHives, 3000);
+
     const q = query(collection(db, 'hives'), where('beekeeperId', '==', bkId));
 
     const unsubscribe = onSnapshot(
@@ -91,7 +119,10 @@ export const MyHivesView: React.FC = () => {
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      clearInterval(interval);
+      unsubscribe();
+    };
   }, [bkId]);
 
   if (selectedHive) {

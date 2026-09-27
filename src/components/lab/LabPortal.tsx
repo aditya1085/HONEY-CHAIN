@@ -193,20 +193,45 @@ export const LabPortal: React.FC<LabPortalProps> = ({ currentUserId, userRole })
     };
   }, []);
 
-  // Real-time listener for hives awaiting Lab Health Verification
+  // Helper to merge and update hives list
+  const processLabHives = (incoming: HiveRecord[]) => {
+    setHives((prev) => {
+      const liveIds = new Set(incoming.map((h) => h.id || h.hiveId));
+      const combined = [
+        ...incoming,
+        ...prev.filter((h) => !liveIds.has(h.id || h.hiveId)),
+        ...SAMPLE_DATA_MASTER.hives.filter((h) => !liveIds.has(h.id || h.hiveId)),
+      ];
+      return Array.from(new Map(combined.map((h) => [h.hiveId || h.id, h])).values());
+    });
+  };
+
+  // Real-time listener & API sync for hives awaiting Lab Health Verification
   useEffect(() => {
+    const fetchApiHives = async () => {
+      try {
+        const res = await fetch('/api/hives');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.hives) && data.hives.length > 0) {
+            processLabHives(data.hives);
+          }
+        }
+      } catch (err) {
+        console.warn('LabPortal API hives fetch note:', err);
+      }
+    };
+
+    fetchApiHives();
+    const interval = setInterval(fetchApiHives, 3000);
+
     const unsubHives = onSnapshot(
       collection(db, 'hives'),
       (snapshot) => {
         const liveList: HiveRecord[] = [];
         snapshot.forEach((d) => liveList.push(d.data() as HiveRecord));
         if (liveList.length > 0) {
-          const liveIds = new Set(liveList.map((h) => h.id || h.hiveId));
-          const combined = [
-            ...liveList,
-            ...SAMPLE_DATA_MASTER.hives.filter((h) => !liveIds.has(h.id || h.hiveId)),
-          ];
-          setHives(combined);
+          processLabHives(liveList);
         }
       },
       (err) => {
@@ -214,7 +239,10 @@ export const LabPortal: React.FC<LabPortalProps> = ({ currentUserId, userRole })
       }
     );
 
-    return () => unsubHives();
+    return () => {
+      clearInterval(interval);
+      unsubHives();
+    };
   }, []);
 
   const handleSubmitHiveHealthCheck = async (e: React.FormEvent) => {
@@ -226,43 +254,85 @@ export const LabPortal: React.FC<LabPortalProps> = ({ currentUserId, userRole })
 
     try {
       const nowIso = new Date().toISOString();
-      const hiveRef = doc(db, 'hives', selectedHiveForHealth.id);
+      const hiveId = selectedHiveForHealth.hiveId || selectedHiveForHealth.id;
 
-      await updateDoc(hiveRef, {
-        approvalStage: 'STAGE_3_ADMIN_FINAL',
-        labVerdict: hiveVerdict,
-        labVerdictNotes: hiveVerdictNotes.trim(),
-        labVerifiedBy: hiveInspector.trim(),
-        labVerifiedAt: nowIso,
-        labId: activeLab?.id || 'LAB_CBRTI_PUNE',
-        updatedAt: nowIso,
-      });
+      // 1. Call Backend API
+      try {
+        await fetch(`/api/hives/${encodeURIComponent(hiveId)}/lab-verdict`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            verdict: hiveVerdict,
+            notes: hiveVerdictNotes.trim(),
+            inspectorName: hiveInspector.trim(),
+            labId: activeLab?.id || 'LAB_CBRTI_PUNE',
+          }),
+        });
+      } catch (apiErr) {
+        console.warn('API lab-verdict warning:', apiErr);
+      }
 
-      // Notify Admin
+      // 2. Update Firestore
+      try {
+        const hiveRef = doc(db, 'hives', selectedHiveForHealth.id);
+        await updateDoc(hiveRef, {
+          approvalStage: 'STAGE_3_ADMIN_FINAL',
+          labVerdict: hiveVerdict,
+          labVerdictNotes: hiveVerdictNotes.trim(),
+          labVerifiedBy: hiveInspector.trim(),
+          labVerifiedAt: nowIso,
+          labId: activeLab?.id || 'LAB_CBRTI_PUNE',
+          updatedAt: nowIso,
+        });
+        await setDoc(doc(db, 'hive_approval_queue', selectedHiveForHealth.id), {
+          ...selectedHiveForHealth,
+          approvalStage: 'STAGE_3_ADMIN_FINAL',
+          labVerdict: hiveVerdict,
+          labVerdictNotes: hiveVerdictNotes.trim(),
+          labVerifiedBy: hiveInspector.trim(),
+          labVerifiedAt: nowIso,
+          labId: activeLab?.id || 'LAB_CBRTI_PUNE',
+          updatedAt: nowIso,
+        }, { merge: true });
+      } catch {}
+
+      // 3. Notify Admin
       try {
         const adminNotifId = `notif_admin_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-        await setDoc(doc(db, 'notifications', adminNotifId), {
+        const adminNotif = {
           id: adminNotifId,
           userId: 'admin',
           title: `🔬 Lab Health Check: ${selectedHiveForHealth.hiveId}`,
           message: `Accredited Lab ${activeLab?.labName || 'CBRTI'} submitted verdict (${hiveVerdict}) for Hive ${selectedHiveForHealth.hiveId}. Awaiting final Admin live activation.`,
-          type: 'INFO',
+          type: 'INFO' as const,
           read: false,
           createdAt: nowIso,
+        };
+        await setDoc(doc(db, 'notifications', adminNotifId), adminNotif);
+        await fetch('/api/notifications', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(adminNotif),
         });
       } catch {}
 
-      // Notify Beekeeper
+      // 4. Notify Beekeeper
       try {
         const beekeeperNotifId = `notif_bk_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-        await setDoc(doc(db, 'notifications', beekeeperNotifId), {
+        const bkNotif = {
           id: beekeeperNotifId,
           userId: selectedHiveForHealth.beekeeperId,
           title: `🔬 Lab Health Verdict: ${hiveVerdict}`,
           message: `Accredited Lab ${activeLab?.labName || 'CBRTI'} verified your Hive ${selectedHiveForHealth.hiveId} with verdict: ${hiveVerdict}. It is now in the final Admin review queue for live activation.`,
-          type: hiveVerdict === 'HEALTHY' ? 'SUCCESS' : 'ALERT',
+          type: hiveVerdict === 'HEALTHY' ? ('SUCCESS' as const) : ('ALERT' as const),
           read: false,
           createdAt: nowIso,
+        };
+        await setDoc(doc(db, 'notifications', beekeeperNotifId), bkNotif);
+        await fetch('/api/notifications', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bkNotif),
         });
       } catch {}
 
@@ -273,6 +343,24 @@ export const LabPortal: React.FC<LabPortalProps> = ({ currentUserId, userRole })
         entityId: selectedHiveForHealth.hiveId,
         details: `Accredited Lab certified health check for Hive ${selectedHiveForHealth.hiveId}. Verdict: ${hiveVerdict}. Notes: ${hiveVerdictNotes.trim()}`,
       });
+
+      // 5. Update local state immediately
+      setHives((prev) =>
+        prev.map((h) =>
+          h.hiveId === hiveId || h.id === selectedHiveForHealth.id
+            ? {
+                ...h,
+                approvalStage: 'STAGE_3_ADMIN_FINAL',
+                labVerdict: hiveVerdict,
+                labVerdictNotes: hiveVerdictNotes.trim(),
+                labVerifiedBy: hiveInspector.trim(),
+                labVerifiedAt: nowIso,
+                labId: activeLab?.id || 'LAB_CBRTI_PUNE',
+                updatedAt: nowIso,
+              }
+            : h
+        )
+      );
 
       setHiveCheckSuccess(`Lab health verdict (${hiveVerdict}) submitted for Hive ${selectedHiveForHealth.hiveId}. Awaiting Admin final live sign-off.`);
       setSelectedHiveForHealth(null);

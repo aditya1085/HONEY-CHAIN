@@ -358,6 +358,14 @@
       "schema": { "$ref": "#/entities/Dispute" },
       "description": "Customer order disputes and refund resolution tracker."
     },
+    "/hive_approval_queue/{queueId}": {
+      "schema": "HiveRecord",
+      "description": "Admin Stage 1 and Stage 2 hive verification approval queue."
+    },
+    "/lab_verification_requests/{requestId}": {
+      "schema": "HiveRecord",
+      "description": "Accredited Lab colony health verification queue."
+    },
     "/audit_logs/{logId}": {
       "schema": "AuditLog",
       "description": "Immutable security and administrative audit logs."

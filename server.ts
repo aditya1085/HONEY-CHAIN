@@ -3731,6 +3731,766 @@ app.post('/api/admin/data/crud', async (req: Request, res: Response) => {
 // In-memory activity log store
 const serverActivityLogs: any[] = [];
 
+// In-memory hive registry with default sample hives seeded
+const serverHives: Map<string, any> = new Map();
+SAMPLE_DATA_MASTER.hives.forEach((h) => {
+  serverHives.set(h.hiveId || h.id, { ...h });
+});
+
+// In-memory beekeepers registry with default sample beekeepers seeded
+const serverBeekeepers: Map<string, any> = new Map();
+SAMPLE_DATA_MASTER.beekeepers.forEach((b) => {
+  const key = b.id || b.beekeeperId || '';
+  if (key) serverBeekeepers.set(key, { ...b });
+});
+
+// In-memory notifications store
+const serverNotifications: any[] = [];
+
+// Pre-seed default persona users
+const serverUsers: Map<string, any> = new Map();
+[
+  {
+    id: 'usr_admin_01',
+    uid: 'BFli0Mn4WPSTHXc8ua0XuQaDGvV2',
+    email: 'admin.honeychain@gmail.com',
+    displayName: 'Aditya Tripathi (Admin)',
+    role: 'ADMIN',
+  },
+  {
+    id: 'usr_beekeeper_demo_01',
+    uid: 'f1PssgHjpNXL6E7eKI0iAWRIrxi1',
+    email: 'beekeeper.demo@honeychain.in',
+    displayName: 'Sita Ram (Beekeeper)',
+    role: 'BEEKEEPER',
+    beekeeperId: 'B001',
+  },
+  {
+    id: 'usr_lab_demo_01',
+    uid: 'FMcQhj3qIEa04HbWnxORiBub3Ew2',
+    email: 'lab.demo@honeychain.in',
+    displayName: 'NABL Central Quality Laboratory',
+    role: 'LAB',
+    labId: 'LAB_CBRTI_PUNE',
+  },
+  {
+    id: 'usr_consumer_demo_01',
+    uid: 'kvJ84GrNobOGxPwZ08MzrCHWrDo1',
+    email: 'consumer.demo@honeychain.in',
+    displayName: 'Arjun Sharma',
+    role: 'CONSUMER',
+  },
+].forEach((u) => {
+  serverUsers.set(u.uid, u);
+  serverUsers.set(u.email, u);
+});
+
+/**
+ * GET /api/hives
+ * Retrieve all hives (master + runtime added)
+ */
+app.get('/api/hives', (_req: Request, res: Response) => {
+  const hivesList = Array.from(serverHives.values());
+  res.json({ success: true, hives: hivesList });
+});
+
+/**
+ * POST /api/hives
+ * Add a new hive (Stage 1: Pending Admin Review)
+ */
+app.post('/api/hives', async (req: Request, res: Response) => {
+  try {
+    const hive = req.body;
+    if (!hive || !hive.hiveId) {
+      res.status(400).json({ error: 'hiveId is required' });
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const normalizedHive = {
+      ...hive,
+      status: hive.status || 'inactive',
+      approvalStatus: hive.approvalStatus || 'pending',
+      approvalStage: 'STAGE_1_ADMIN_REVIEW',
+      createdAt: hive.createdAt || nowIso,
+      updatedAt: nowIso,
+    };
+
+    serverHives.set(normalizedHive.hiveId, normalizedHive);
+    if (normalizedHive.id) {
+      serverHives.set(normalizedHive.id, normalizedHive);
+    }
+
+    // Create notification for Beekeeper
+    const notifId = `notif_bk_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const notif = {
+      id: notifId,
+      userId: normalizedHive.beekeeperId,
+      title: '📋 Hive Submitted for Stage 1 Review',
+      message: `Hive ${normalizedHive.hiveId} has been successfully submitted and is now awaiting Stage 1 Admin Review. After admin approval, an accredited laboratory will conduct health verification before final live activation.`,
+      type: 'INFO',
+      read: false,
+      createdAt: nowIso,
+    };
+    serverNotifications.unshift(notif);
+
+    // Create notification for Admin
+    const adminNotif = {
+      id: `notif_admin_${Date.now()}`,
+      userId: 'admin',
+      title: '🐝 New Hive Awaiting Stage 1 Review',
+      message: `Beekeeper ${normalizedHive.beekeeperId} submitted Hive ${normalizedHive.hiveId} (${normalizedHive.colonyType}) for Stage 1 verification.`,
+      type: 'INFO',
+      read: false,
+      createdAt: nowIso,
+    };
+    serverNotifications.unshift(adminNotif);
+
+    // Log Activity
+    serverActivityLogs.unshift({
+      id: `log_${Date.now()}`,
+      action: 'HIVE_SUBMITTED_FOR_REVIEW',
+      entityType: 'HIVE',
+      entityId: normalizedHive.hiveId,
+      details: `Hive ${normalizedHive.hiveId} (${normalizedHive.colonyType}) submitted for Stage 1 Admin Review by beekeeper ${normalizedHive.beekeeperId}`,
+      actorRole: 'BEEKEEPER',
+      timestamp: nowIso,
+    });
+
+    // Background Firestore attempt
+    try {
+      const docId = normalizedHive.id || `HIVE_${normalizedHive.hiveId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      await setDoc(doc(db, 'hives', docId), normalizedHive, { merge: true });
+    } catch {}
+
+    res.json({ success: true, hive: normalizedHive });
+  } catch (err) {
+    console.error('Add hive error:', err);
+    res.status(500).json({ error: 'Failed to record hive', details: String(err) });
+  }
+});
+
+/**
+ * POST /api/hives/:hiveId/stage1-accept
+ * Admin Stage 1 accept -> Forwards to Accredited Lab (Stage 2: Pending Lab Health Verification)
+ */
+app.post('/api/hives/:hiveId/stage1-accept', async (req: Request, res: Response) => {
+  try {
+    const { hiveId } = req.params;
+    const { adminUid } = req.body;
+
+    let hive = serverHives.get(hiveId);
+    if (!hive) {
+      // Look up by id
+      for (const h of serverHives.values()) {
+        if (h.id === hiveId || h.hiveId === hiveId) {
+          hive = h;
+          break;
+        }
+      }
+    }
+
+    if (!hive) {
+      res.status(404).json({ error: `Hive ${hiveId} not found` });
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const updated = {
+      ...hive,
+      approvalStage: 'STAGE_2_LAB_VERIFICATION',
+      approvalStatus: 'pending',
+      adminStage1ApprovedBy: adminUid || 'admin',
+      adminStage1ApprovedAt: nowIso,
+      updatedAt: nowIso,
+    };
+
+    serverHives.set(hive.hiveId, updated);
+    if (hive.id) serverHives.set(hive.id, updated);
+
+    // Notify Beekeeper
+    const notifId = `notif_bk_${Date.now()}`;
+    serverNotifications.unshift({
+      id: notifId,
+      userId: hive.beekeeperId,
+      title: '✅ Hive Stage 1 Approved — Sent to Lab',
+      message: `Hive ${hive.hiveId} has passed Stage 1 Admin Review! It has been forwarded to the Accredited Testing Laboratory for colony health & biosecurity verification.`,
+      type: 'INFO',
+      read: false,
+      createdAt: nowIso,
+    });
+
+    // Notify Lab
+    serverNotifications.unshift({
+      id: `notif_lab_${Date.now()}`,
+      userId: 'lab',
+      title: '🔬 New Hive Awaiting Health Verification',
+      message: `Hive ${hive.hiveId} (${hive.colonyType}) from Beekeeper ${hive.beekeeperId} requires colony biosecurity and health assessment.`,
+      type: 'INFO',
+      read: false,
+      createdAt: nowIso,
+    });
+
+    // Log Activity
+    serverActivityLogs.unshift({
+      id: `log_${Date.now()}`,
+      action: 'HIVE_STAGE_1_APPROVED',
+      entityType: 'HIVE',
+      entityId: hive.hiveId,
+      details: `Admin approved Stage 1 for Hive ${hive.hiveId}. Forwarded to Accredited Lab for biosecurity check.`,
+      actorRole: 'ADMIN',
+      timestamp: nowIso,
+    });
+
+    // Background Firestore attempt
+    try {
+      const docId = hive.id || `HIVE_${hive.hiveId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      await updateDoc(doc(db, 'hives', docId), {
+        approvalStage: 'STAGE_2_LAB_VERIFICATION',
+        approvalStatus: 'pending',
+        adminStage1ApprovedBy: adminUid || 'admin',
+        adminStage1ApprovedAt: nowIso,
+        updatedAt: nowIso,
+      });
+    } catch {}
+
+    res.json({ success: true, hive: updated });
+  } catch (err) {
+    console.error('Stage 1 accept error:', err);
+    res.status(500).json({ error: 'Stage 1 accept failed', details: String(err) });
+  }
+});
+
+/**
+ * POST /api/hives/:hiveId/stage1-reject
+ * Admin Stage 1 reject
+ */
+app.post('/api/hives/:hiveId/stage1-reject', async (req: Request, res: Response) => {
+  try {
+    const { hiveId } = req.params;
+    const { reason, adminUid } = req.body;
+
+    let hive = serverHives.get(hiveId);
+    if (!hive) {
+      for (const h of serverHives.values()) {
+        if (h.id === hiveId || h.hiveId === hiveId) {
+          hive = h;
+          break;
+        }
+      }
+    }
+
+    if (!hive) {
+      res.status(404).json({ error: `Hive ${hiveId} not found` });
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const updated = {
+      ...hive,
+      status: 'inactive',
+      approvalStatus: 'rejected',
+      approvalStage: 'REJECTED',
+      rejectionStage: 'STAGE_1_ADMIN',
+      rejectionReason: reason || 'Requirements not met during initial administrative review.',
+      rejectedBy: adminUid || 'admin',
+      rejectedAt: nowIso,
+      updatedAt: nowIso,
+    };
+
+    serverHives.set(hive.hiveId, updated);
+    if (hive.id) serverHives.set(hive.id, updated);
+
+    // Notify Beekeeper
+    serverNotifications.unshift({
+      id: `notif_bk_${Date.now()}`,
+      userId: hive.beekeeperId,
+      title: '❌ Hive Registration Rejected (Stage 1)',
+      message: `Hive ${hive.hiveId} was rejected during Stage 1 Admin Review. Reason: ${reason}`,
+      type: 'ALERT',
+      read: false,
+      createdAt: nowIso,
+    });
+
+    // Log Activity
+    serverActivityLogs.unshift({
+      id: `log_${Date.now()}`,
+      action: 'HIVE_REJECTED',
+      entityType: 'HIVE',
+      entityId: hive.hiveId,
+      details: `Hive ${hive.hiveId} rejected during Stage 1. Reason: ${reason}`,
+      actorRole: 'ADMIN',
+      timestamp: nowIso,
+    });
+
+    res.json({ success: true, hive: updated });
+  } catch (err) {
+    console.error('Stage 1 reject error:', err);
+    res.status(500).json({ error: 'Stage 1 reject failed', details: String(err) });
+  }
+});
+
+/**
+ * POST /api/hives/:hiveId/lab-verdict
+ * Accredited Lab submits health verdict (Healthy / Unhealthy) -> Forwards to Stage 3 (Final Admin Review)
+ */
+app.post('/api/hives/:hiveId/lab-verdict', async (req: Request, res: Response) => {
+  try {
+    const { hiveId } = req.params;
+    const { verdict, notes, inspectorName, labId } = req.body;
+
+    let hive = serverHives.get(hiveId);
+    if (!hive) {
+      for (const h of serverHives.values()) {
+        if (h.id === hiveId || h.hiveId === hiveId) {
+          hive = h;
+          break;
+        }
+      }
+    }
+
+    if (!hive) {
+      res.status(404).json({ error: `Hive ${hiveId} not found` });
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const updated = {
+      ...hive,
+      approvalStage: 'STAGE_3_ADMIN_FINAL',
+      labVerdict: verdict || 'HEALTHY',
+      labVerdictNotes: notes || '',
+      labVerifiedBy: inspectorName || 'Accredited Entomologist',
+      labVerifiedAt: nowIso,
+      labId: labId || 'LAB_CBRTI_PUNE',
+      updatedAt: nowIso,
+    };
+
+    serverHives.set(hive.hiveId, updated);
+    if (hive.id) serverHives.set(hive.id, updated);
+
+    // Notify Admin
+    serverNotifications.unshift({
+      id: `notif_admin_${Date.now()}`,
+      userId: 'admin',
+      title: `🔬 Lab Health Check: ${hive.hiveId}`,
+      message: `Accredited Lab submitted verdict (${verdict}) for Hive ${hive.hiveId}. Awaiting final Admin live activation.`,
+      type: 'INFO',
+      read: false,
+      createdAt: nowIso,
+    });
+
+    // Notify Beekeeper
+    serverNotifications.unshift({
+      id: `notif_bk_${Date.now()}`,
+      userId: hive.beekeeperId,
+      title: `🔬 Lab Health Verdict: ${verdict}`,
+      message: `Accredited Lab verified your Hive ${hive.hiveId} with verdict: ${verdict}. Notes: ${notes}. It is now in the final Admin review queue for live activation.`,
+      type: verdict === 'HEALTHY' ? 'SUCCESS' : 'ALERT',
+      read: false,
+      createdAt: nowIso,
+    });
+
+    // Log Activity
+    serverActivityLogs.unshift({
+      id: `log_${Date.now()}`,
+      action: 'HIVE_LAB_HEALTH_VERIFIED',
+      entityType: 'HIVE',
+      entityId: hive.hiveId,
+      details: `Accredited Lab certified health check for Hive ${hive.hiveId}. Verdict: ${verdict}. Notes: ${notes}`,
+      actorRole: 'LAB',
+      timestamp: nowIso,
+    });
+
+    // Background Firestore attempt
+    try {
+      const docId = hive.id || `HIVE_${hive.hiveId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      await updateDoc(doc(db, 'hives', docId), {
+        approvalStage: 'STAGE_3_ADMIN_FINAL',
+        labVerdict: verdict || 'HEALTHY',
+        labVerdictNotes: notes || '',
+        labVerifiedBy: inspectorName || 'Accredited Entomologist',
+        labVerifiedAt: nowIso,
+        labId: labId || 'LAB_CBRTI_PUNE',
+        updatedAt: nowIso,
+      });
+    } catch {}
+
+    res.json({ success: true, hive: updated });
+  } catch (err) {
+    console.error('Lab verdict error:', err);
+    res.status(500).json({ error: 'Lab verdict submission failed', details: String(err) });
+  }
+});
+
+/**
+ * POST /api/hives/:hiveId/final-approve
+ * Admin Stage 2 Final Decision: APPROVE -> Hive becomes Active
+ */
+app.post('/api/hives/:hiveId/final-approve', async (req: Request, res: Response) => {
+  try {
+    const { hiveId } = req.params;
+    const { adminUid } = req.body;
+
+    let hive = serverHives.get(hiveId);
+    if (!hive) {
+      for (const h of serverHives.values()) {
+        if (h.id === hiveId || h.hiveId === hiveId) {
+          hive = h;
+          break;
+        }
+      }
+    }
+
+    if (!hive) {
+      res.status(404).json({ error: `Hive ${hiveId} not found` });
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const updated = {
+      ...hive,
+      status: 'active',
+      approvalStatus: 'approved',
+      approvalStage: 'COMPLETED',
+      finalApprovedBy: adminUid || 'admin',
+      finalApprovedAt: nowIso,
+      updatedAt: nowIso,
+    };
+
+    serverHives.set(hive.hiveId, updated);
+    if (hive.id) serverHives.set(hive.id, updated);
+
+    // Notify Beekeeper
+    serverNotifications.unshift({
+      id: `notif_bk_${Date.now()}`,
+      userId: hive.beekeeperId,
+      title: '🎉 Hive Live & Certified Active!',
+      message: `Congratulations! Your Hive ${hive.hiveId} has received final Admin certification following Accredited Lab health check. The hive is now LIVE — you can pair IoT telemetry hardware and log honey harvests.`,
+      type: 'SUCCESS',
+      read: false,
+      createdAt: nowIso,
+    });
+
+    // Log Activity
+    serverActivityLogs.unshift({
+      id: `log_${Date.now()}`,
+      action: 'HIVE_FINAL_APPROVED_ACTIVATED',
+      entityType: 'HIVE',
+      entityId: hive.hiveId,
+      details: `Admin gave final approval for Hive ${hive.hiveId} (Lab Verdict: ${hive.labVerdict || 'HEALTHY'}). Hive is now ACTIVE.`,
+      actorRole: 'ADMIN',
+      timestamp: nowIso,
+    });
+
+    // Background Firestore attempt
+    try {
+      const docId = hive.id || `HIVE_${hive.hiveId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      await updateDoc(doc(db, 'hives', docId), {
+        status: 'active',
+        approvalStatus: 'approved',
+        approvalStage: 'COMPLETED',
+        finalApprovedBy: adminUid || 'admin',
+        finalApprovedAt: nowIso,
+        updatedAt: nowIso,
+      });
+    } catch {}
+
+    res.json({ success: true, hive: updated });
+  } catch (err) {
+    console.error('Final approve error:', err);
+    res.status(500).json({ error: 'Final approve failed', details: String(err) });
+  }
+});
+
+/**
+ * POST /api/hives/:hiveId/final-reject
+ * Admin Stage 2 Final Decision: REJECT
+ */
+app.post('/api/hives/:hiveId/final-reject', async (req: Request, res: Response) => {
+  try {
+    const { hiveId } = req.params;
+    const { reason, adminUid } = req.body;
+
+    let hive = serverHives.get(hiveId);
+    if (!hive) {
+      for (const h of serverHives.values()) {
+        if (h.id === hiveId || h.hiveId === hiveId) {
+          hive = h;
+          break;
+        }
+      }
+    }
+
+    if (!hive) {
+      res.status(404).json({ error: `Hive ${hiveId} not found` });
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const updated = {
+      ...hive,
+      status: 'inactive',
+      approvalStatus: 'rejected',
+      approvalStage: 'REJECTED',
+      rejectionStage: 'STAGE_2_ADMIN_FINAL',
+      rejectionReason: reason || 'Colony health verification criteria not met.',
+      rejectedBy: adminUid || 'admin',
+      rejectedAt: nowIso,
+      updatedAt: nowIso,
+    };
+
+    serverHives.set(hive.hiveId, updated);
+    if (hive.id) serverHives.set(hive.id, updated);
+
+    // Notify Beekeeper
+    serverNotifications.unshift({
+      id: `notif_bk_${Date.now()}`,
+      userId: hive.beekeeperId,
+      title: '❌ Hive Registration Rejected (Final Review)',
+      message: `Hive ${hive.hiveId} was rejected during Stage 2 Final Admin Review. Reason: ${reason}`,
+      type: 'ALERT',
+      read: false,
+      createdAt: nowIso,
+    });
+
+    // Log Activity
+    serverActivityLogs.unshift({
+      id: `log_${Date.now()}`,
+      action: 'HIVE_REJECTED',
+      entityType: 'HIVE',
+      entityId: hive.hiveId,
+      details: `Hive ${hive.hiveId} rejected during Stage 2 Final. Reason: ${reason}`,
+      actorRole: 'ADMIN',
+      timestamp: nowIso,
+    });
+
+    res.json({ success: true, hive: updated });
+  } catch (err) {
+    console.error('Final reject error:', err);
+    res.status(500).json({ error: 'Final reject failed', details: String(err) });
+  }
+});
+
+/**
+ * GET /api/beekeepers
+ * Retrieve all registered beekeepers
+ */
+app.get('/api/beekeepers', (_req: Request, res: Response) => {
+  res.json({ success: true, beekeepers: Array.from(serverBeekeepers.values()) });
+});
+
+/**
+ * POST /api/beekeepers/approve
+ * Admin approves a beekeeper registration
+ */
+app.post('/api/beekeepers/approve', async (req: Request, res: Response) => {
+  try {
+    const { beekeeperId: bkDocId, assignedId, adminUid } = req.body;
+    let beekeeper = serverBeekeepers.get(bkDocId);
+    if (!beekeeper) {
+      for (const b of serverBeekeepers.values()) {
+        if (b.id === bkDocId || b.userId === bkDocId || b.beekeeperId === bkDocId) {
+          beekeeper = b;
+          break;
+        }
+      }
+    }
+
+    if (!beekeeper) {
+      res.status(404).json({ error: 'Beekeeper not found' });
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const finalId = assignedId || beekeeper.beekeeperId || 'B001';
+
+    const updated = {
+      ...beekeeper,
+      status: 'approved',
+      beekeeperId: finalId,
+      approvedBy: adminUid || 'admin',
+      approvedAt: nowIso,
+      updatedAt: nowIso,
+    };
+
+    serverBeekeepers.set(beekeeper.id || bkDocId, updated);
+    if (beekeeper.beekeeperId) serverBeekeepers.set(beekeeper.beekeeperId, updated);
+
+    // Notify Beekeeper
+    serverNotifications.unshift({
+      id: `notif_bk_${Date.now()}`,
+      userId: beekeeper.userId || beekeeper.id,
+      title: '🎉 Apiary Registration Approved!',
+      message: `Your Honey Chain Beekeeper credentials have been approved by the Administrator. Your Official Beekeeper ID is ${finalId}. You can now register hives and log honey harvests.`,
+      type: 'SUCCESS',
+      read: false,
+      createdAt: nowIso,
+    });
+
+    // Log Activity
+    serverActivityLogs.unshift({
+      id: `log_${Date.now()}`,
+      action: 'BEEKEEPER_APPROVED',
+      entityType: 'BEEKEEPER',
+      entityId: finalId,
+      details: `Approved beekeeper ${beekeeper.name} with new assigned ID: ${finalId}`,
+      actorRole: 'ADMIN',
+      timestamp: nowIso,
+    });
+
+    res.json({ success: true, beekeeper: updated });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to approve beekeeper', details: String(err) });
+  }
+});
+
+/**
+ * GET /api/users
+ * Retrieve users for User Management View
+ */
+app.get('/api/users', (_req: Request, res: Response) => {
+  const usersList = Array.from(serverUsers.values());
+  res.json({ success: true, users: usersList });
+});
+
+/**
+ * POST /api/users/update-role
+ * Update user role
+ */
+app.post('/api/users/update-role', (req: Request, res: Response) => {
+  const { uid, role } = req.body;
+  if (!uid || !role) {
+    res.status(400).json({ error: 'uid and role are required' });
+    return;
+  }
+  const user = serverUsers.get(uid);
+  if (user) {
+    user.role = role;
+    user.updatedAt = new Date().toISOString();
+    serverUsers.set(uid, user);
+    res.json({ success: true, user });
+  } else {
+    const newUser = {
+      id: uid,
+      uid,
+      role,
+      updatedAt: new Date().toISOString(),
+    };
+    serverUsers.set(uid, newUser);
+    res.json({ success: true, user: newUser });
+  }
+});
+
+/**
+ * GET /api/notifications
+ * Retrieve notifications filtered by userId
+ */
+app.get('/api/notifications', (req: Request, res: Response) => {
+  const { userId, userEmail } = req.query;
+  const filtered = serverNotifications.filter((n) => {
+    if (!userId && !userEmail) return true;
+    if (userId === 'admin' || userEmail === 'admin.honeychain@gmail.com') {
+      return n.userId === 'admin' || n.userId === userId;
+    }
+    return n.userId === userId || n.userId === userEmail;
+  });
+  res.json({ success: true, notifications: filtered });
+});
+
+/**
+ * POST /api/notifications
+ * Create in-app notification
+ */
+app.post('/api/notifications', (req: Request, res: Response) => {
+  const notif = req.body;
+  if (notif && notif.title) {
+    const n = {
+      id: notif.id || `notif_${Date.now()}`,
+      userId: notif.userId || 'all',
+      title: notif.title,
+      message: notif.message || '',
+      type: notif.type || 'INFO',
+      read: false,
+      createdAt: new Date().toISOString(),
+    };
+    serverNotifications.unshift(n);
+    res.json({ success: true, notification: n });
+  } else {
+    res.status(400).json({ error: 'Invalid notification data' });
+  }
+});
+
+/**
+ * POST /api/auth/persona-profile
+ * Retrieve and ensure real persona profile document
+ */
+app.post('/api/auth/persona-profile', async (req: Request, res: Response) => {
+  const { role, uid, email } = req.body;
+  const cleanEmail = (email || '').toLowerCase().trim();
+
+  let assignedRole = role || 'CONSUMER';
+  if (cleanEmail === 'admin.honeychain@gmail.com') assignedRole = 'ADMIN';
+  else if (cleanEmail === 'beekeeper.demo@honeychain.in') assignedRole = 'BEEKEEPER';
+  else if (cleanEmail === 'lab.demo@honeychain.in') assignedRole = 'LAB';
+  else if (cleanEmail === 'consumer.demo@honeychain.in') assignedRole = 'CONSUMER';
+
+  const userProfile = {
+    id: uid,
+    uid,
+    email: cleanEmail,
+    displayName:
+      assignedRole === 'ADMIN'
+        ? 'Aditya Tripathi (Admin)'
+        : assignedRole === 'BEEKEEPER'
+        ? 'Sita Ram (Beekeeper)'
+        : assignedRole === 'LAB'
+        ? 'NABL Central Quality Laboratory'
+        : 'Arjun Sharma',
+    role: assignedRole,
+    beekeeperId: assignedRole === 'BEEKEEPER' ? 'B001' : undefined,
+    labId: assignedRole === 'LAB' ? 'LAB_CBRTI_PUNE' : undefined,
+    updatedAt: new Date().toISOString(),
+  };
+
+  serverUsers.set(uid, userProfile);
+  serverUsers.set(cleanEmail, userProfile);
+
+  let beekeeperProfile = null;
+  if (assignedRole === 'BEEKEEPER') {
+    beekeeperProfile = {
+      id: uid,
+      userId: uid,
+      beekeeperId: 'B001',
+      name: 'Sita Ram (Beekeeper)',
+      email: cleanEmail,
+      phone: '+91 98765 43210',
+      state: 'Uttar Pradesh',
+      district: 'Lucknow',
+      address: 'Plot 42, Bee Corridor, Mohanlalganj, Lucknow',
+      lat: 26.8467,
+      lng: 80.9462,
+      aadhaarLast4: '1234',
+      aadhaarHash: 'c7be8f5619b02a2498dbca204f14e59178ad54911d7fc49116e036df52b0c169',
+      madhukrantiId: 'NBB/UP/2026/0123',
+      totalHivesPlanned: 20,
+      status: 'approved',
+      trustScore: 98,
+      isSample: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    serverBeekeepers.set(uid, beekeeperProfile);
+    serverBeekeepers.set('B001', beekeeperProfile);
+  }
+
+  res.json({
+    success: true,
+    userProfile,
+    beekeeperProfile,
+  });
+});
+
 /**
  * POST /api/activity-logs
  * Non-blocking activity log receiver

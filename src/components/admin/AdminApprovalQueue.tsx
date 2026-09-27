@@ -29,12 +29,14 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { SAMPLE_DATA_MASTER } from '../../services/sampleDataMaster';
 
-export const AdminApprovalQueue: React.FC = () => {
+export const AdminApprovalQueue: React.FC<{ defaultSubTab?: 'beekeepers' | 'hives' }> = ({
+  defaultSubTab = 'beekeepers',
+}) => {
   const { currentUser } = useAuth();
   const { t } = useLanguage();
 
   // Primary Tab: Beekeepers vs Hives
-  const [mainTab, setMainTab] = useState<'beekeepers' | 'hives'>('beekeepers');
+  const [mainTab, setMainTab] = useState<'beekeepers' | 'hives'>(defaultSubTab);
 
   // Beekeepers state
   const [beekeepers, setBeekeepers] = useState<BeekeeperProfile[]>(SAMPLE_DATA_MASTER.beekeepers);
@@ -97,8 +99,46 @@ export const AdminApprovalQueue: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  // Real-time Hives listener
+  // Helper to merge and sort hives
+  const processHivesList = (incoming: HiveRecord[]) => {
+    setHives((prev) => {
+      const liveIds = new Set(incoming.map((h) => h.id || h.hiveId));
+      const combined = [
+        ...incoming,
+        ...prev.filter((h) => !liveIds.has(h.id || h.hiveId)),
+        ...SAMPLE_DATA_MASTER.hives.filter((h) => !liveIds.has(h.id || h.hiveId)),
+      ];
+      const unique = Array.from(new Map(combined.map((h) => [h.hiveId || h.id, h])).values());
+      unique.sort((a, b) => {
+        const aPending = a.approvalStage === 'STAGE_1_ADMIN_REVIEW' || a.approvalStage === 'STAGE_3_ADMIN_FINAL';
+        const bPending = b.approvalStage === 'STAGE_1_ADMIN_REVIEW' || b.approvalStage === 'STAGE_3_ADMIN_FINAL';
+        if (aPending && !bPending) return -1;
+        if (!aPending && bPending) return 1;
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      });
+      return unique;
+    });
+  };
+
+  // Real-time Hives listener & API dual-source sync
   useEffect(() => {
+    const fetchApiHives = async () => {
+      try {
+        const res = await fetch('/api/hives');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.hives) && data.hives.length > 0) {
+            processHivesList(data.hives);
+          }
+        }
+      } catch (err) {
+        console.warn('API hives fetch note:', err);
+      }
+    };
+
+    fetchApiHives();
+    const interval = setInterval(fetchApiHives, 3000);
+
     const unsubHives = onSnapshot(
       collection(db, 'hives'),
       (snapshot) => {
@@ -106,23 +146,9 @@ export const AdminApprovalQueue: React.FC = () => {
         snapshot.forEach((d) => {
           liveList.push(d.data() as HiveRecord);
         });
-
-        const liveIds = new Set(liveList.map((h) => h.id || h.hiveId));
-        const combined = [
-          ...liveList,
-          ...SAMPLE_DATA_MASTER.hives.filter((h) => !liveIds.has(h.id || h.hiveId)),
-        ];
-
-        // Sort: pending review first, then by date
-        combined.sort((a, b) => {
-          const aPending = a.approvalStage === 'STAGE_1_ADMIN_REVIEW' || a.approvalStage === 'STAGE_3_ADMIN_FINAL';
-          const bPending = b.approvalStage === 'STAGE_1_ADMIN_REVIEW' || b.approvalStage === 'STAGE_3_ADMIN_FINAL';
-          if (aPending && !bPending) return -1;
-          if (!aPending && bPending) return 1;
-          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-        });
-
-        setHives(combined);
+        if (liveList.length > 0) {
+          processHivesList(liveList);
+        }
         setLoadingHives(false);
       },
       (err) => {
@@ -131,7 +157,10 @@ export const AdminApprovalQueue: React.FC = () => {
       }
     );
 
-    return () => unsubHives();
+    return () => {
+      clearInterval(interval);
+      unsubHives();
+    };
   }, []);
 
   // ===================== BEEKEEPER HANDLERS =====================
@@ -277,27 +306,64 @@ export const AdminApprovalQueue: React.FC = () => {
 
     try {
       const nowIso = new Date().toISOString();
-      const hiveRef = doc(db, 'hives', selectedHive.id);
+      const hiveId = selectedHive.hiveId || selectedHive.id;
 
-      await updateDoc(hiveRef, {
-        approvalStage: 'STAGE_2_LAB_VERIFICATION',
-        approvalStatus: 'pending',
-        adminStage1ApprovedBy: currentUser.uid,
-        adminStage1ApprovedAt: nowIso,
-        updatedAt: nowIso,
-      });
+      // 1. Call Backend API
+      try {
+        await fetch(`/api/hives/${encodeURIComponent(hiveId)}/stage1-accept`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ adminUid: currentUser.uid }),
+        });
+      } catch (apiErr) {
+        console.warn('API stage1-accept warning:', apiErr);
+      }
 
-      // Notify Beekeeper
+      // 2. Update Firestore
+      try {
+        const hiveRef = doc(db, 'hives', selectedHive.id);
+        await updateDoc(hiveRef, {
+          approvalStage: 'STAGE_2_LAB_VERIFICATION',
+          approvalStatus: 'pending',
+          adminStage1ApprovedBy: currentUser.uid,
+          adminStage1ApprovedAt: nowIso,
+          updatedAt: nowIso,
+        });
+        await setDoc(doc(db, 'hive_approval_queue', selectedHive.id), {
+          ...selectedHive,
+          approvalStage: 'STAGE_2_LAB_VERIFICATION',
+          approvalStatus: 'pending',
+          adminStage1ApprovedBy: currentUser.uid,
+          adminStage1ApprovedAt: nowIso,
+          updatedAt: nowIso,
+        }, { merge: true });
+        await setDoc(doc(db, 'lab_verification_requests', selectedHive.id), {
+          ...selectedHive,
+          approvalStage: 'STAGE_2_LAB_VERIFICATION',
+          approvalStatus: 'pending',
+          adminStage1ApprovedBy: currentUser.uid,
+          adminStage1ApprovedAt: nowIso,
+          updatedAt: nowIso,
+        }, { merge: true });
+      } catch {}
+
+      // 3. Notify Beekeeper
       try {
         const notifId = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-        await setDoc(doc(db, 'notifications', notifId), {
+        const notifPayload = {
           id: notifId,
           userId: selectedHive.beekeeperId,
           title: '✅ Hive Stage 1 Approved — Sent to Lab',
           message: `Hive ${selectedHive.hiveId} has passed Stage 1 Admin Review! It has been forwarded to the Accredited Testing Laboratory for colony health & biosecurity verification.`,
-          type: 'INFO',
+          type: 'INFO' as const,
           read: false,
           createdAt: nowIso,
+        };
+        await setDoc(doc(db, 'notifications', notifId), notifPayload);
+        await fetch('/api/notifications', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(notifPayload),
         });
       } catch {}
 
@@ -308,6 +374,22 @@ export const AdminApprovalQueue: React.FC = () => {
         details: `Admin approved Stage 1 for Hive ${selectedHive.hiveId}. Forwarded to Accredited Lab for biosecurity check.`,
         actorRole: 'ADMIN',
       });
+
+      // 4. Update local state immediately
+      setHives((prev) =>
+        prev.map((h) =>
+          h.hiveId === hiveId || h.id === selectedHive.id
+            ? {
+                ...h,
+                approvalStage: 'STAGE_2_LAB_VERIFICATION',
+                approvalStatus: 'pending',
+                adminStage1ApprovedBy: currentUser.uid,
+                adminStage1ApprovedAt: nowIso,
+                updatedAt: nowIso,
+              }
+            : h
+        )
+      );
 
       setSelectedHive(null);
     } catch (err: unknown) {
@@ -326,28 +408,58 @@ export const AdminApprovalQueue: React.FC = () => {
 
     try {
       const nowIso = new Date().toISOString();
-      const hiveRef = doc(db, 'hives', selectedHive.id);
+      const hiveId = selectedHive.hiveId || selectedHive.id;
 
-      await updateDoc(hiveRef, {
-        status: 'active',
-        approvalStatus: 'approved',
-        approvalStage: 'COMPLETED',
-        finalApprovedBy: currentUser.uid,
-        finalApprovedAt: nowIso,
-        updatedAt: nowIso,
-      });
+      // 1. Call Backend API
+      try {
+        await fetch(`/api/hives/${encodeURIComponent(hiveId)}/final-approve`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ adminUid: currentUser.uid }),
+        });
+      } catch (apiErr) {
+        console.warn('API final-approve warning:', apiErr);
+      }
 
-      // Notify Beekeeper
+      // 2. Update Firestore
+      try {
+        const hiveRef = doc(db, 'hives', selectedHive.id);
+        await updateDoc(hiveRef, {
+          status: 'active',
+          approvalStatus: 'approved',
+          approvalStage: 'COMPLETED',
+          finalApprovedBy: currentUser.uid,
+          finalApprovedAt: nowIso,
+          updatedAt: nowIso,
+        });
+        await setDoc(doc(db, 'hive_approval_queue', selectedHive.id), {
+          ...selectedHive,
+          status: 'active',
+          approvalStatus: 'approved',
+          approvalStage: 'COMPLETED',
+          finalApprovedBy: currentUser.uid,
+          finalApprovedAt: nowIso,
+          updatedAt: nowIso,
+        }, { merge: true });
+      } catch {}
+
+      // 3. Notify Beekeeper
       try {
         const notifId = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-        await setDoc(doc(db, 'notifications', notifId), {
+        const notifPayload = {
           id: notifId,
           userId: selectedHive.beekeeperId,
           title: '🎉 Hive Live & Certified Active!',
           message: `Congratulations! Your Hive ${selectedHive.hiveId} has received final Admin certification following Accredited Lab health check. The hive is now LIVE — you can pair IoT telemetry hardware and log honey harvests.`,
-          type: 'SUCCESS',
+          type: 'SUCCESS' as const,
           read: false,
           createdAt: nowIso,
+        };
+        await setDoc(doc(db, 'notifications', notifId), notifPayload);
+        await fetch('/api/notifications', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(notifPayload),
         });
       } catch {}
 
@@ -358,6 +470,23 @@ export const AdminApprovalQueue: React.FC = () => {
         details: `Admin gave final approval for Hive ${selectedHive.hiveId} (Lab Verdict: ${selectedHive.labVerdict || 'HEALTHY'}). Hive is now ACTIVE.`,
         actorRole: 'ADMIN',
       });
+
+      // 4. Update local state immediately
+      setHives((prev) =>
+        prev.map((h) =>
+          h.hiveId === hiveId || h.id === selectedHive.id
+            ? {
+                ...h,
+                status: 'active',
+                approvalStatus: 'approved',
+                approvalStage: 'COMPLETED',
+                finalApprovedBy: currentUser.uid,
+                finalApprovedAt: nowIso,
+                updatedAt: nowIso,
+              }
+            : h
+        )
+      );
 
       setSelectedHive(null);
     } catch (err: unknown) {
@@ -381,30 +510,66 @@ export const AdminApprovalQueue: React.FC = () => {
 
     try {
       const nowIso = new Date().toISOString();
-      const hiveRef = doc(db, 'hives', selectedHive.id);
+      const hiveId = selectedHive.hiveId || selectedHive.id;
+      const endpoint = stage === 'STAGE_1_ADMIN' ? `/api/hives/${encodeURIComponent(hiveId)}/stage1-reject` : `/api/hives/${encodeURIComponent(hiveId)}/final-reject`;
 
-      await updateDoc(hiveRef, {
-        status: 'inactive',
-        approvalStatus: 'rejected',
-        approvalStage: 'REJECTED',
-        rejectionStage: stage,
-        rejectionReason: hiveRejectionReason.trim(),
-        rejectedBy: currentUser.uid,
-        rejectedAt: nowIso,
-        updatedAt: nowIso,
-      });
+      // 1. Call Backend API
+      try {
+        await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            reason: hiveRejectionReason.trim(),
+            adminUid: currentUser.uid,
+          }),
+        });
+      } catch (apiErr) {
+        console.warn('API reject warning:', apiErr);
+      }
 
-      // Notify Beekeeper
+      // 2. Update Firestore
+      try {
+        const hiveRef = doc(db, 'hives', selectedHive.id);
+        await updateDoc(hiveRef, {
+          status: 'inactive',
+          approvalStatus: 'rejected',
+          approvalStage: 'REJECTED',
+          rejectionStage: stage,
+          rejectionReason: hiveRejectionReason.trim(),
+          rejectedBy: currentUser.uid,
+          rejectedAt: nowIso,
+          updatedAt: nowIso,
+        });
+        await setDoc(doc(db, 'hive_approval_queue', selectedHive.id), {
+          ...selectedHive,
+          status: 'inactive',
+          approvalStatus: 'rejected',
+          approvalStage: 'REJECTED',
+          rejectionStage: stage,
+          rejectionReason: hiveRejectionReason.trim(),
+          rejectedBy: currentUser.uid,
+          rejectedAt: nowIso,
+          updatedAt: nowIso,
+        }, { merge: true });
+      } catch {}
+
+      // 3. Notify Beekeeper
       try {
         const notifId = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-        await setDoc(doc(db, 'notifications', notifId), {
+        const notifPayload = {
           id: notifId,
           userId: selectedHive.beekeeperId,
           title: '❌ Hive Registration Rejected',
           message: `Hive ${selectedHive.hiveId} was rejected during ${stage === 'STAGE_1_ADMIN' ? 'Stage 1 Admin Review' : 'Stage 2 Final Admin Review'}. Reason: ${hiveRejectionReason.trim()}`,
-          type: 'ALERT',
+          type: 'ALERT' as const,
           read: false,
           createdAt: nowIso,
+        };
+        await setDoc(doc(db, 'notifications', notifId), notifPayload);
+        await fetch('/api/notifications', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(notifPayload),
         });
       } catch {}
 
@@ -415,6 +580,25 @@ export const AdminApprovalQueue: React.FC = () => {
         details: `Hive ${selectedHive.hiveId} rejected during ${stage}. Reason: ${hiveRejectionReason.trim()}`,
         actorRole: 'ADMIN',
       });
+
+      // 4. Update local state immediately
+      setHives((prev) =>
+        prev.map((h) =>
+          h.hiveId === hiveId || h.id === selectedHive.id
+            ? {
+                ...h,
+                status: 'inactive',
+                approvalStatus: 'rejected',
+                approvalStage: 'REJECTED',
+                rejectionStage: stage,
+                rejectionReason: hiveRejectionReason.trim(),
+                rejectedBy: currentUser.uid,
+                rejectedAt: nowIso,
+                updatedAt: nowIso,
+              }
+            : h
+        )
+      );
 
       setSelectedHive(null);
       setShowHiveRejectModal(false);

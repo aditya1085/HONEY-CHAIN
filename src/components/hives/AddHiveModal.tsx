@@ -124,9 +124,20 @@ export const AddHiveModal: React.FC<AddHiveModalProps> = ({ isOpen, onClose, onS
         updatedAt: new Date().toISOString(),
       };
 
-      // 2. Persist to Firestore with local cache guarantee
+      // 2. Persist to Backend API & Firestore with local cache guarantee
+      try {
+        await fetch('/api/hives', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(hiveData),
+        });
+      } catch (apiErr) {
+        console.warn('Backend API hives sync warning:', apiErr);
+      }
+
       try {
         await setDoc(doc(db, 'hives', docId), hiveData);
+        await setDoc(doc(db, 'hive_approval_queue', docId), hiveData);
       } catch (firestoreErr) {
         console.warn('Hive persistence local fallback:', firestoreErr);
       }
@@ -155,7 +166,7 @@ export const AddHiveModal: React.FC<AddHiveModalProps> = ({ isOpen, onClose, onS
       // 4. Create in-app notification for Beekeeper
       try {
         const notifId = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-        await setDoc(doc(db, 'notifications', notifId), {
+        const notifPayload = {
           id: notifId,
           userId: currentUser?.uid || bkId,
           title: '📋 Hive Submitted for Stage 1 Review',
@@ -163,6 +174,12 @@ export const AddHiveModal: React.FC<AddHiveModalProps> = ({ isOpen, onClose, onS
           type: 'INFO',
           read: false,
           createdAt: new Date().toISOString(),
+        };
+        await setDoc(doc(db, 'notifications', notifId), notifPayload);
+        await fetch('/api/notifications', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(notifPayload),
         });
       } catch {}
 
